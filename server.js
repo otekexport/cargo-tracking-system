@@ -85,6 +85,20 @@ app.post('/api/admin/delete', (req, res) => {
     });
 });
 
+// Admin Get All Records API
+app.post('/api/admin/all', (req, res) => {
+    const { admin_password } = req.body;
+
+    if (admin_password !== ADMIN_PASSWORD) {
+        return res.json({ success: false, message: 'Invalid Admin Password!' });
+    }
+
+    db.all('SELECT * FROM shipments ORDER BY rowid DESC', [], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true, data: rows });
+    });
+});
+
 // Admin Bulk Upload API
 app.post('/api/admin/bulk-update', (req, res) => {
     const { admin_password, shipments } = req.body;
