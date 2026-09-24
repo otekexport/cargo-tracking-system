@@ -58,6 +58,54 @@
         .result-item strong {
             color: #0b253a;
         }
+
+        /* WhatsApp Section Styling */
+        .whatsapp-card {
+            margin-top: 20px;
+            padding: 18px;
+            background: #e8f5e9;
+            border: 1px solid #c8e6c9;
+            border-radius: 12px;
+            text-align: center;
+        }
+        .whatsapp-buttons-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin: 12px 0;
+        }
+        .whatsapp-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            background: #25D366;
+            color: white;
+            padding: 10px 18px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 14px;
+            box-shadow: 0 4px 10px rgba(37, 211, 102, 0.3);
+            transition: background 0.3s, transform 0.2s;
+        }
+        .whatsapp-btn:hover {
+            background: #1eb854;
+            transform: translateY(-2px);
+        }
+        .time-notice {
+            font-size: 13px;
+            color: #1b5e20;
+            line-height: 1.6;
+            text-align: left;
+            background: white;
+            padding: 12px 15px;
+            border-radius: 8px;
+            border-left: 4px solid #25D366;
+            margin-top: 10px;
+        }
+
         #msg, #loginMsg, #bulkMsg, #deleteMsg { margin-top: 12px; font-weight: bold; text-align: center; font-size: 14px; }
     </style>
 </head>
@@ -143,6 +191,11 @@
     <script>
         let currentAdminPassword = "";
 
+        // WhatsApp Numbers Configuration
+        const WHATSAPP_NUMBER_1 = "94740784400";
+        const WHATSAPP_NUMBER_2 = "94740304400";
+        const WHATSAPP_NUMBER_3 = "94740104400";
+
         function switchTab(tabName) {
             document.getElementById('customer').classList.remove('active');
             document.getElementById('admin').classList.remove('active');
@@ -168,6 +221,29 @@
                         <div class="result-item"><strong>Customer Name:</strong> ${data.data.customer_name || '-'}</div>
                         <div class="result-item"><strong>Status:</strong> ${data.data.status || '-'}</div>
                         <div class="result-item"><strong>Destination:</strong> ${data.data.destination || '-'}</div>
+                    </div>
+
+                    <!-- WhatsApp 3 Lines Contact Box -->
+                    <div class="whatsapp-card">
+                        <h4 style="margin:0 0 8px 0; color:#1b5e20;">💬 Contact Sri Lanka Office (WhatsApp)</h4>
+                        
+                        <div class="whatsapp-buttons-container">
+                            <a href="https://wa.me/${WHATSAPP_NUMBER_1}" target="_blank" class="whatsapp-btn">
+                                📞 Line 1: +94 74 078 4400
+                            </a>
+                            <a href="https://wa.me/${WHATSAPP_NUMBER_2}" target="_blank" class="whatsapp-btn">
+                                📞 Line 2: +94 74 030 4400
+                            </a>
+                            <a href="https://wa.me/${WHATSAPP_NUMBER_3}" target="_blank" class="whatsapp-btn">
+                                📞 Line 3: +94 74 010 4400
+                            </a>
+                        </div>
+
+                        <div class="time-notice">
+                            📌 <b>සිංහල:</b> කරුණාකර සතියේ වැඩකරන දිනයන්හි පෙ.ව. 8:30 සිට ප.ව. 5:00 දක්වා වේලාවන් තුළ අමතන්න.<br>
+                            📌 <b>English:</b> Please call on working days from 8:30 AM to 5:00 PM.<br>
+                            📌 <b>தமிழ்:</b> தயவுசெய்து வேலை நாட்களில் காலை 8:30 மணி முதல் மாலை 5:00 மணி வரை தொடர்புகொள்ளவும்.
+                        </div>
                     </div>
                 `;
             } else {
@@ -275,10 +351,8 @@
                         
                         const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/^"\vert{}"$/g, ''));
 
-                        // Smart detection for 4-column (old) vs 6-column (new) CSVs
                         if (cols.length >= 4) {
                             if (cols.length >= 6 || isNaN(Number(cols[0]))) {
-                                // 6 Columns: arrival_date, clearing_warehouse, invoice_number, customer_name, status, destination
                                 if (cols[2]) {
                                     shipments.push({
                                         arrival_date: cols[0] || '',
@@ -290,7 +364,6 @@
                                     });
                                 }
                             } else {
-                                // 4 Columns: invoice_number, customer_name, status, destination
                                 if (cols[0]) {
                                     shipments.push({
                                         arrival_date: '',
