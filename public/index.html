@@ -22,7 +22,7 @@
             padding: 25px; 
             border-radius: 16px; 
             box-shadow: 0 8px 32px rgba(0,0,0,0.3); 
-            width: 420px; 
+            width: 380px; 
             max-width: 95%;
             text-align: left; 
         }
@@ -38,15 +38,9 @@
         button.admin-btn { background: #007bff; }
         button.bulk-btn { background: #6f42c1; }
         button.delete-btn { background: #dc3545; }
-        button.view-btn { background: #17a2b8; }
+        button.view-page-btn { background: #17a2b8; }
         .section-divider { border-top: 1px solid #ddd; margin: 20px 0; }
         #result, #msg, #loginMsg, #bulkMsg, #deleteMsg { margin-top: 12px; font-weight: bold; text-align: center; font-size: 14px; }
-        
-        /* Table Styling */
-        table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
-        th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
-        th { background-color: #007bff; color: white; }
-        tr:nth-child(even) { background-color: #f2f2f2; }
     </style>
 </head>
 <body>
@@ -81,10 +75,9 @@
 
             <!-- Admin Forms -->
             <div id="adminUpdateForm" style="display: none;">
-                <!-- All Cargo Records List -->
-                <h4 style="margin: 0 0 5px 0; color: #17a2b8;">All Cargo Records</h4>
-                <button class="submit-btn view-btn" onclick="loadAllShipments()">📋 Load / Refresh All Data</button>
-                <div id="shipmentsTableContainer" style="max-height: 200px; overflow-y: auto; margin-top: 10px;"></div>
+                <!-- Full Table Page Button -->
+                <h4 style="margin: 0 0 5px 0; color: #17a2b8;">View & Manage Database</h4>
+                <button class="submit-btn view-page-btn" onclick="openRecordsPage()">📂 Open All Records in New Page</button>
 
                 <div class="section-divider"></div>
 
@@ -156,61 +149,22 @@
             if(!pass) return alert('Please enter password');
 
             currentAdminPassword = pass;
+            sessionStorage.setItem('adminPassword', pass); // Store for new page
             document.getElementById('adminLoginForm').style.display = 'none';
             document.getElementById('adminUpdateForm').style.display = 'block';
             document.getElementById('loginMsg').innerText = '';
-            loadAllShipments(); // Auto load list upon login
         }
 
         function logoutAdmin() {
             currentAdminPassword = "";
+            sessionStorage.removeItem('adminPassword');
             document.getElementById('adminPassword').value = "";
             document.getElementById('adminLoginForm').style.display = 'block';
             document.getElementById('adminUpdateForm').style.display = 'none';
         }
 
-        async function loadAllShipments() {
-            const res = await fetch('/api/admin/all', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ admin_password: currentAdminPassword })
-            });
-
-            const result = await res.json();
-            const container = document.getElementById('shipmentsTableContainer');
-
-            if (result.success) {
-                if (result.data.length === 0) {
-                    container.innerHTML = "<p style='text-align:center; font-size:13px; color:#666;'>No cargo records found in database.</p>";
-                    return;
-                }
-
-                let html = `<table>
-                    <thead>
-                        <tr>
-                            <th>Invoice</th>
-                            <th>Name</th>
-                            <th>Status</th>
-                            <th>Dest.</th>
-                        </tr>
-                    </thead>
-                    <tbody>`;
-                
-                result.data.forEach(row => {
-                    html += `<tr>
-                        <td><b>${row.invoice_number}</b></td>
-                        <td>${row.customer_name}</td>
-                        <td>${row.status}</td>
-                        <td>${row.destination}</td>
-                    </tr>`;
-                });
-
-                html += `</tbody></table>`;
-                container.innerHTML = html;
-            } else {
-                container.innerHTML = `<p style="color:red; text-align:center;">${result.message}</p>`;
-                if (result.message === 'Invalid Admin Password!') logoutAdmin();
-            }
+        function openRecordsPage() {
+            window.open('/records.html', '_blank');
         }
 
         async function updateShipment() {
@@ -235,7 +189,6 @@
             if(result.success) {
                 msgDiv.style.color = "green";
                 msgDiv.innerText = result.message;
-                loadAllShipments(); // Refresh Table
             } else {
                 msgDiv.style.color = "red";
                 msgDiv.innerText = result.message || "Error updating shipment!";
@@ -264,7 +217,6 @@
                 deleteMsg.style.color = "green";
                 deleteMsg.innerText = result.message;
                 document.getElementById('deleteInv').value = "";
-                loadAllShipments(); // Refresh Table
             } else {
                 deleteMsg.style.color = "red";
                 deleteMsg.innerText = result.message || "Error deleting shipment!";
@@ -314,7 +266,6 @@
                     bulkMsg.style.color = "green";
                     bulkMsg.innerText = result.message;
                     fileInput.value = "";
-                    loadAllShipments(); // Refresh Table
                 } else {
                     bulkMsg.style.color = "red";
                     bulkMsg.innerText = result.message || "Bulk update failed!";
