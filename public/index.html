@@ -79,22 +79,58 @@
             margin: 0 auto 15px auto;
         }
 
-        /* Bank & Slip Section Styling */
-        .bank-card {
+        /* Payment Container Grid */
+        .payment-container {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
             margin-top: 20px;
-            padding: 18px;
-            background: #f0f7ff;
-            border: 1px solid #b8daff;
-            border-radius: 12px;
         }
-        .bank-details-box {
+
+        /* Bank Card Styling */
+        .bank-card {
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        
+        .sl-bank-card {
+            background: #f4f9ff;
+            border: 1px solid #b8daff;
+        }
+
+        .jp-bank-card {
+            background: #fffdf5;
+            border: 1px solid #ffeeba;
+        }
+
+        .bank-title {
+            margin: 0 0 12px 0;
+            font-size: 16px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .bank-details-grid {
             background: white;
             padding: 15px;
             border-radius: 8px;
-            border: 1px solid #d6e9c6;
-            margin-bottom: 15px;
+            border: 1px solid #e2e8f0;
             font-size: 14px;
-            line-height: 1.7;
+            line-height: 1.8;
+            color: #2d3748;
+        }
+
+        .bank-note {
+            margin-top: 12px;
+            padding: 10px 14px;
+            background: #edf2f7;
+            border-radius: 6px;
+            font-size: 12px;
+            color: #4a5568;
+            line-height: 1.5;
         }
 
         /* WhatsApp Section Styling */
@@ -144,7 +180,7 @@
             margin-top: 10px;
         }
 
-        #msg, #loginMsg, #bulkMsg, #deleteMsg, #slipMsg { margin-top: 12px; font-weight: bold; text-align: center; font-size: 14px; }
+        #msg, #loginMsg, #bulkMsg, #deleteMsg { margin-top: 12px; font-weight: bold; text-align: center; font-size: 14px; }
     </style>
 </head>
 <body>
@@ -257,7 +293,7 @@
                     speedX: (Math.random() - 0.5) * 0.4,
                     opacity: Math.random(),
                     fadeSpeed: Math.random() * 0.02 + 0.005,
-                    color: Math.random() > 0.3 ? '#FFD700' : '#FFF8DC' // Gold and Warm Glow
+                    color: Math.random() > 0.3 ? '#FFD700' : '#FFF8DC'
                 });
             }
         }
@@ -318,13 +354,6 @@
             const data = await res.json();
             const div = document.getElementById('result');
             if(data.success) {
-                let slipStatusText = "";
-                if (data.data.payment_slip) {
-                    slipStatusText = `<div style="background:#d4edda; color:#155724; padding:10px; border-radius:6px; margin-top:10px; font-weight:bold; text-align:center;">
-                        ✅ Payment Slip Uploaded & Being Verified
-                    </div>`;
-                }
-
                 div.innerHTML = `
                     <div class="result-box">
                         <div class="result-item"><strong>Arrival Date:</strong> ${data.data.arrival_date || '-'}</div>
@@ -335,25 +364,56 @@
                         <div class="result-item"><strong>Destination:</strong> ${data.data.destination || '-'}</div>
                     </div>
 
-                    <!-- Bank Details & Payment Slip Upload Box -->
-                    <div class="bank-card">
-                        <h4 style="margin:0 0 10px 0; color:#004085;">🏦 Bank Transfer Details & Receipt Upload</h4>
+                    <!-- Payment Information Container -->
+                    <div class="payment-container">
                         
-                        <div class="bank-details-box">
-                            <b>Bank Name:</b> Commercial Bank PLC<br>
-                            <b>Account Name:</b> Otek Export / Panorama Cargo Logistics<br>
-                            <b>Account Number:</b> 1234 5678 9012<br>
-                            <b>Branch:</b> Colombo Main Branch
+                        <!-- 🇱🇰 Sri Lanka Bank Details -->
+                        <div class="bank-card sl-bank-card">
+                            <div class="bank-title" style="color: #004085;">
+                                🇱🇰 SRI LANKA PAYMENT INFORMATION - PANORAMA CARGO LOGISTICS (PVT) LTD
+                            </div>
+                            <div class="bank-details-grid">
+                                <b>Beneficiary Name:</b> PANORAMA CARGO LOGISTICS (PVT) LTD<br>
+                                <b>Account Number:</b> 1000769959<br>
+                                <b>Bank Name:</b> Commercial Bank<br>
+                                <b>Branch Name:</b> Panchikawatta Branch
+                            </div>
+                            <div class="bank-note">
+                                📌 <b>Note:</b> Please make all your cash deposits / online fund transfers to the above bank account & submit the deposit slip with your Invoice at our counter.<br>
+                                ⚠️ <b>Important:</b> Please mention your Invoice No. & BL No. in the 'Purpose' column. (This will help us track your payment quickly.)
+                            </div>
                         </div>
 
-                        ${slipStatusText}
+                        <!-- 🇯🇵 Japan Bank Details -->
+                        <div class="bank-card jp-bank-card">
+                            <div class="bank-title" style="color: #856404;">
+                                🇯🇵 JAPAN BANK ACCOUNT DETAILS FOR REMITTANCE (ප්‍රේෂණය සඳහා බැංකු ගිණුම් විස්තර)
+                            </div>
+                            <div class="bank-details-grid">
+                                <b>ACCOUNT HOLDER NAME (ගිණුම් හිමියාගේ නම):</b><br>
+                                OTEK MOTOR EXPORT Co.,Ltd (オテックモーターエクスポート (カ)<br><br>
+                                
+                                <b>BANK DETAILS (බැංකු විස්තර):</b><br>
+                                <b>Bank Name:</b> JAPAN POST BANK (ゆうちょ銀行)<br>
+                                <b>Institution Code:</b> 9900<br><br>
 
-                        <label style="margin-top:12px;">📤 Upload Your Bank Payment Slip / Receipt:</label>
-                        <input type="file" id="slipInput" accept="image/*,.pdf">
-                        <button class="submit-btn" style="background:#007bff;" onclick="uploadSlip('${data.data.invoice_number}')">
-                            Upload Bank Receipt
-                        </button>
-                        <div id="slipMsg"></div>
+                                <b>REMITTANCE BRANCH & ACCOUNT INFO (ප්‍රේෂණ ශාඛාව සහ ගිණුම් විස්තර):</b><br>
+                                <i>- For use when sending from other financial institutions (වෙනත් මුල්‍ය ආයතන වලින් එවන විට භාවිතයට)</i><br>
+                                <b>Branch Name:</b> ZERO YON HACHI (ゼロヨンハチ)<br>
+                                <b>Branch Code:</b> 048<br>
+                                <b>Deposit Type:</b> ORDINARY DEPOSIT (普通預金)<br>
+                                <b>Account Number:</b> 3250683<br><br>
+
+                                <b>ADDITIONAL INFORMATION (අමතර විස්තර):</b><br>
+                                <b>Japan Post Account:</b> 10490 - 32506831<br>
+                                <b>Name:</b> オテックモーターエクスポート (カ
+                            </div>
+                            <div class="bank-note">
+                                💡 Please use the 'Remittance Branch & Account Info' above for inter-bank transfers. Thank you.<br>
+                                (අන්තර් බැංකු හුවමාරු සඳහා කරුණාකර ඉහත 'ප්‍රේෂණ ශාඛාව සහ ගිණුම් විස්තර' භාවිතා කරන්න. ස්තුතියි.)
+                            </div>
+                        </div>
+
                     </div>
 
                     <!-- WhatsApp 3 Lines Contact Box -->
@@ -382,37 +442,6 @@
             } else {
                 div.innerHTML = "<p style='color:red; text-align:center; padding:10px;'>" + data.message + "</p>";
             }
-        }
-
-        async function uploadSlip(invoiceNum) {
-            const fileInput = document.getElementById('slipInput');
-            const file = fileInput.files[0];
-            if (!file) return alert('Please select a payment slip image first!');
-
-            const reader = new FileReader();
-            reader.onload = async function(e) {
-                const base64Data = e.target.result;
-                const res = await fetch('/api/upload-slip', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        invoice_number: invoiceNum,
-                        slip_base64: base64Data
-                    })
-                });
-
-                const result = await res.json();
-                const slipMsg = document.getElementById('slipMsg');
-                if (result.success) {
-                    slipMsg.style.color = "green";
-                    slipMsg.innerText = result.message;
-                    fileInput.value = "";
-                } else {
-                    slipMsg.style.color = "red";
-                    slipMsg.innerText = result.message || "Slip upload failed!";
-                }
-            };
-            reader.readAsDataURL(file);
         }
 
         function verifyPassword() {
