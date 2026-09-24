@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cargo Management System</title>
+    <style>
+        /* Full Background CSS */
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            
+            /* Background Image Setup */
+            background-image: url('bg.jpg'); /* ඔයාගේ image එකේ නම (eg: bg.jpg / bg.png) */
+            background-size: cover;          /* Screen එක පුරාම පැතිරෙන්න */
+            background-position: center;     /* Center එකට align වෙන්න */
+            background-repeat: no-repeat;    /* Repeat නොවී තියෙන්න */
+            background-attachment: fixed;    /* Scroll කරද්දී fix වී තියෙන්න */
+        }
+
+        /* Card / Box styling (Semi-transparent for readability) */
+        .card { 
+            background: rgba(255, 255, 255, 0.92); /* Background එක ලාවට පෙනෙන transparent සුදු පැහැය */
+            backdrop-filter: blur(8px);             /* Glass Blur effect එක */
+            padding: 30px; 
+            border-radius: 16px; 
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3); 
+            width: 380px; 
+            text-align: left; 
+        }
+
+        .nav-buttons { display: flex; justify-content: space-around; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .nav-btn { background: none; border: none; font-size: 15px; font-weight: bold; cursor: pointer; color: #666; padding: 8px 12px; }
+        .nav-btn.active { color: #007bff; border-bottom: 3px solid #007bff; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        label { font-size: 13px; font-weight: bold; color: #333; display: block; margin-top: 10px; }
+        input[type="text"], input[type="password"], input[type="file"] { width: 100%; padding: 10px; margin: 4px 0 10px 0; font-size: 14px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; }
+        button.submit-btn { width: 100%; padding: 10px; font-size: 16px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; margin-top: 10px; }
+        button.admin-btn { background: #007bff; }
+        button.bulk-btn { background: #6f42c1; }
+        .section-divider { border-top: 1px solid #ddd; margin: 20px 0; }
+        #result, #msg, #loginMsg, #bulkMsg { margin-top: 12px; font-weight: bold; text-align: center; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <!-- Navigation Tabs -->
+        <div class="nav-buttons">
+            <button class="nav-btn active" id="btn-customer" onclick="switchTab('customer')">📦 Track Cargo</button>
+            <button class="nav-btn" id="btn-admin" onclick="switchTab('admin')">🛠️ Admin Panel</button>
+        </div>
+
+        <!-- Tab 1: Customer View -->
+        <div id="customer" class="tab-content active">
+            <h3 style="margin-top:0; color:#28a745; text-align: center;">Customer Tracking</h3>
+            <label>Invoice Number:</label>
+            <input type="text" id="invoice" placeholder="e.g. INV-1001">
+            <button class="submit-btn" onclick="track()">Track Status</button>
+            <div id="result"></div>
+        </div>
+
+        <!-- Tab 2: Admin View -->
+        <div id="admin" class="tab-content">
+            <h3 style="margin-top:0; color:#007bff; text-align: center;">Admin Panel</h3>
+            
+            <!-- Login Form -->
+            <div id="adminLoginForm">
+                <label>Admin Password:</label>
+                <input type="password" id="adminPassword" placeholder="Enter Password">
+                <button class="submit-btn admin-btn" onclick="verifyPassword()">Login to Admin</button>
+                <div id="loginMsg"></div>
+            </div>
+
+            <!-- Admin Forms -->
+            <div id="adminUpdateForm" style="display: none;">
+                <h4 style="margin: 0 0 5px 0;">Single Cargo Update</h4>
+                <label>Invoice Number:</label>
+                <input type="text" id="inv" placeholder="INV-1001">
+                <label>Customer Name:</label>
+                <input type="text" id="name" placeholder="Kamal Perera">
+                <label>Status:</label>
+                <input type="text" id="status" placeholder="In Transit / Delivered">
+                <label>Destination:</label>
+                <input type="text" id="dest" placeholder="Colombo">
+                <button class="submit-btn admin-btn" onclick="updateShipment()">Save Single Status</button>
+                <div id="msg"></div>
+
+                <div class="section-divider"></div>
+
+                <h4 style="margin: 0 0 5px 0;">Bulk Upload (CSV File)</h4>
+                <label>Select CSV File:</label>
+                <input type="file" id="csvFile" accept=".csv">
+                <button class="submit-btn bulk-btn" onclick="uploadCSV()">Upload Bulk CSV</button>
+                <div id="bulkMsg"></div>
+
+                <div class="section-divider"></div>
+                <button style="background: #dc3545; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold;" onclick="logoutAdmin()">Logout</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentAdminPassword = "";
+
+        function switchTab(tabName) {
+            document.getElementById('customer').classList.remove('active');
+            document.getElementById('admin').classList.remove('active');
+            document.getElementById('btn-customer').classList.remove('active');
+            document.getElementById('btn-admin').classList.remove('active');
+            
+            document.getElementById(tabName).classList.add('active');
+            document.getElementById('btn-' + tabName).classList.add('active');
+        }
+
+        async function track() {
+            const inv = document.getElementById('invoice').value.trim();
+            if (!inv) return alert('Please enter Invoice Number');
+            const res = await fetch('/api/track/' + inv);
+            const data = await res.json();
+            const div = document.getElementById('result');
+            if(data.success) {
+                div.innerHTML = "<p style='color:green;'>Status: " + data.data.status + "<br>Customer: " + data.data.customer_name + "<br>Destination: " + data.data.destination + "</p>";
+            } else {
+                div.innerHTML = "<p style='color:red;'>" + data.message + "</p>";
+            }
+        }
+
+        function verifyPassword() {
+            const pass = document.getElementById('adminPassword').value;
+            if(!pass) return alert('Please enter password');
+
+            currentAdminPassword = pass;
+            document.getElementById('adminLoginForm').style.display = 'none';
+            document.getElementById('adminUpdateForm').style.display = 'block';
+            document.getElementById('loginMsg').innerText = '';
+        }
+
+        function logoutAdmin() {
+            currentAdminPassword = "";
+            document.getElementById('adminPassword').value = "";
+            document.getElementById('adminLoginForm').style.display = 'block';
+            document.getElementById('adminUpdateForm').style.display = 'none';
+        }
+
+        async function updateShipment() {
+            const data = {
+                admin_password: currentAdminPassword,
+                invoice_number: document.getElementById('inv').value,
+                customer_name: document.getElementById('name').value,
+                status: document.getElementById('status').value,
+                destination: document.getElementById('dest').value
+            };
+
+            if(!data.invoice_number) return alert('Enter Invoice Number');
+
+            const res = await fetch('/api/admin/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            const result = await res.json();
+            const msgDiv = document.getElementById('msg');
+            if(result.success) {
+                msgDiv.style.color = "green";
+                msgDiv.innerText = result.message;
+            } else {
+                msgDiv.style.color = "red";
+                msgDiv.innerText = result.message || "Error updating shipment!";
+                if(result.message === 'Invalid Admin Password!') logoutAdmin();
+            }
+        }
+
+        function uploadCSV() {
+            const fileInput = document.getElementById('csvFile');
+            const file = fileInput.files[0];
+            if (!file) return alert('Please select a CSV file first!');
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const text = e.target.result;
+                const lines = text.split('\n');
+                const shipments = [];
+
+                for (let i = 1; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (!line) continue;
+                    const cols = line.split(',').map(c => c.trim());
+                    if (cols.length >= 1 && cols[0]) {
+                        shipments.push({
+                            invoice_number: cols[0],
+                            customer_name: cols[1] || '',
+                            status: cols[2] || '',
+                            destination: cols[3] || ''
+                        });
+                    }
+                }
+
+                if (shipments.length === 0) return alert('No valid data found in CSV!');
+
+                const res = await fetch('/api/admin/bulk-update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        admin_password: currentAdminPassword,
+                        shipments: shipments
+                    })
+                });
+
+                const result = await res.json();
+                const bulkMsg = document.getElementById('bulkMsg');
+                if(result.success) {
+                    bulkMsg.style.color = "green";
+                    bulkMsg.innerText = result.message;
+                    fileInput.value = "";
+                } else {
+                    bulkMsg.style.color = "red";
+                    bulkMsg.innerText = result.message || "Bulk update failed!";
+                    if(result.message === 'Invalid Admin Password!') logoutAdmin();
+                }
+            };
+            reader.readAsText(file);
+        }
+    </script>
+</body>
+</html>

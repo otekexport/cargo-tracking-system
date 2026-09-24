@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background-color: #eef2f5; }
+        .card { background: white; padding: 30px; border-radius: 10px; display: inline-block; box-shadow: 0 4px 8px rgba(0,0,0,0.1); width: 320px; }
+        input { width: 90%; padding: 8px; margin: 8px 0; font-size: 14px; }
+        button { padding: 10px 20px; font-size: 16px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px; }
+        #msg { margin-top: 15px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>🛠️ Admin Dashboard</h2>
+        <input type="text" id="inv" placeholder="Invoice Number (e.g. INV-1001)">
+        <input type="text" id="name" placeholder="Customer Name">
+        <input type="text" id="status" placeholder="Status (e.g. In Transit)">
+        <input type="text" id="dest" placeholder="Destination">
+        <button onclick="updateShipment()">Update Status</button>
+        <div id="msg"></div>
+    </div>
+
+    <script>
+        async function updateShipment() {
+            const data = {
+                invoice_number: document.getElementById('inv').value,
+                customer_name: document.getElementById('name').value,
+                status: document.getElementById('status').value,
+                destination: document.getElementById('dest').value
+            };
+
+            const res = await fetch('/api/admin/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            const result = await res.json();
+            const msgDiv = document.getElementById('msg');
+            if(result.success) {
+                msgDiv.style.color = "green";
+                msgDiv.innerText = result.message;
+            } else {
+                msgDiv.style.color = "red";
+                msgDiv.innerText = "Error updating shipment!";
+            }
+        }
+    </script>
+</body>
+</html>
