@@ -79,10 +79,10 @@
             margin: 0 auto 15px auto;
         }
 
-        /* 🟢 Visual Progress Timeline Steps (Matching Infographic) */
+        /* 🟢 Horizontal Visual Progress Timeline Steps */
         .timeline-container {
             margin-top: 25px;
-            padding: 20px;
+            padding: 22px 15px;
             background: #f0fdf4;
             border: 1px solid #bbf7d0;
             border-radius: 12px;
@@ -92,54 +92,60 @@
             font-size: 18px;
             font-weight: bold;
             color: #166534;
-            margin-bottom: 20px;
+            margin-bottom: 25px;
         }
         .step-list {
             display: flex;
-            flex-direction: column;
-            gap: 12px;
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: flex-start;
             position: relative;
-            max-width: 650px;
+            max-width: 850px;
             margin: 0 auto;
+            gap: 15px;
         }
         .step-item {
             display: flex;
+            flex-direction: column;
             align-items: center;
-            gap: 15px;
+            text-align: center;
             position: relative;
             z-index: 1;
+            flex: 1;
         }
         .step-number {
-            width: 42px;
-            height: 42px;
+            width: 46px;
+            height: 46px;
             border-radius: 50%;
-            background: #e2e8f0;
-            color: #64748b;
+            background: #cbd5e1;
+            color: #475569;
             font-weight: bold;
             font-size: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
-            flex-shrink: 0;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
             transition: all 0.3s;
+            margin-bottom: 12px;
         }
         .step-card {
-            flex-grow: 1;
             background: white;
-            padding: 12px 18px;
-            border-radius: 30px;
+            padding: 12px 15px;
+            border-radius: 12px;
             border: 1px solid #e2e8f0;
             box-shadow: 0 2px 8px rgba(0,0,0,0.04);
             display: flex;
+            flex-direction: column;
             align-items: center;
-            justify-content: space-between;
+            gap: 6px;
             font-weight: bold;
-            color: #475569;
-            font-size: 14px;
+            color: #64748b;
+            font-size: 13px;
+            width: 100%;
+            box-sizing: border-box;
         }
         .step-icon {
-            font-size: 20px;
+            font-size: 24px;
         }
 
         /* Active / Completed Step Styling */
@@ -164,16 +170,43 @@
             100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
         }
 
-        /* Connecting vertical line */
+        /* Connecting Horizontal Line */
         .step-list::before {
             content: '';
             position: absolute;
-            left: 20px;
-            top: 20px;
-            bottom: 20px;
-            width: 3px;
+            top: 23px;
+            left: 15%;
+            right: 15%;
+            height: 3px;
             background: #cbd5e1;
             z-index: 0;
+        }
+
+        /* Responsive Mobile Layout Adjustment */
+        @media (max-width: 650px) {
+            .step-list {
+                flex-direction: column;
+                gap: 15px;
+            }
+            .step-item {
+                flex-direction: row;
+                text-align: left;
+            }
+            .step-number {
+                margin-bottom: 0;
+            }
+            .step-card {
+                flex-direction: row;
+                justify-content: space-between;
+            }
+            .step-list::before {
+                top: 22px;
+                bottom: 22px;
+                left: 22px;
+                right: auto;
+                width: 3px;
+                height: auto;
+            }
         }
 
         /* Payment Container Grid */
@@ -498,16 +531,33 @@
             document.getElementById('btn-' + tabName).classList.add('active');
         }
 
-        // Helper to determine active step from status text
-        function getActiveStep(statusText) {
-            if (!statusText) return 3;
-            const s = statusText.toLowerCase();
-            if (s.includes('deliver') || s.includes('collected') || s.includes('completed')) return 5;
-            if (s.includes('clearance') || s.includes('warehouse') || s.includes('clearing') || s.includes('laksiri')) return 4;
-            if (s.includes('arrived') || s.includes('sri lanka') || s.includes('port')) return 3;
-            if (s.includes('transit') || s.includes('vessel') || s.includes('shipped') || s.includes('sailing')) return 2;
-            if (s.includes('received') || s.includes('packed') || s.includes('japan')) return 1;
-            return 3; // Default in-progress step
+        // Logic to calculate active step (Default Step 2, Step 3 on/after Arrival Date)
+        function getActiveStep(statusText, arrivalDateStr) {
+            let activeStep = 2; // Default Position: Shipped & In Transit (Vessel)
+
+            if (arrivalDateStr && arrivalDateStr.trim() !== '' && arrivalDateStr.trim() !== '-') {
+                const parsedArrival = new Date(arrivalDateStr);
+                if (!isNaN(parsedArrival.getTime())) {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    parsedArrival.setHours(0, 0, 0, 0);
+
+                    if (today >= parsedArrival) {
+                        activeStep = 3; // Move to Final Step: Arrived at Port
+                    }
+                }
+            }
+
+            if (statusText) {
+                const s = statusText.toLowerCase();
+                if (s.includes('arrived') || s.includes('port') || s.includes('warehouse') || s.includes('clearing')) {
+                    activeStep = 3;
+                } else if (s.includes('received') || s.includes('packed') || s.includes('japan')) {
+                    activeStep = 1;
+                }
+            }
+
+            return activeStep;
         }
 
         async function track() {
@@ -517,14 +567,12 @@
             const data = await res.json();
             const div = document.getElementById('result');
             if(data.success) {
-                const activeStep = getActiveStep(data.data.status);
+                const activeStep = getActiveStep(data.data.status, data.data.arrival_date);
 
                 const steps = [
                     { num: 1, title: "Cargo Received & Packed (Japan)", icon: "📦" },
                     { num: 2, title: "Shipped & In Transit (Vessel)", icon: "🚢" },
-                    { num: 3, title: "Arrived at Port (Sri Lanka)", icon: "⚓" },
-                    { num: 4, title: "Customs Clearing & Warehouse", icon: "🏬" },
-                    { num: 5, title: "Ready for Pickup / Delivered", icon: "✅" }
+                    { num: 3, title: "Arrived at Port (Sri Lanka)", icon: "⚓" }
                 ];
 
                 let timelineHtml = `
@@ -543,8 +591,8 @@
                         <div class="step-item ${activeClass} ${currentClass}">
                             <div class="step-number">${st.num}</div>
                             <div class="step-card">
-                                <span>${st.title}</span>
                                 <span class="step-icon">${st.icon}</span>
+                                <span>${st.title}</span>
                             </div>
                         </div>
                     `;
