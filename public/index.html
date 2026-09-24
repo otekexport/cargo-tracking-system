@@ -180,6 +180,40 @@
             margin-top: 10px;
         }
 
+        /* Footer Section Styling */
+        .footer-section {
+            margin-top: 35px;
+            padding-top: 18px;
+            border-top: 1px solid #e2e8f0;
+            text-align: center;
+            font-size: 13px;
+            color: #64748b;
+            line-height: 1.6;
+        }
+        .footer-links {
+            margin-top: 8px;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+        .footer-links a {
+            color: #007bff;
+            text-decoration: none;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .footer-links a:hover {
+            text-decoration: underline;
+        }
+        .developer-tag {
+            font-size: 12px;
+            color: #475569;
+            margin-top: 6px;
+        }
+        .developer-tag strong {
+            color: #0b253a;
+        }
+
         #msg, #loginMsg, #bulkMsg, #deleteMsg { margin-top: 12px; font-weight: bold; text-align: center; font-size: 14px; }
     </style>
 </head>
@@ -265,6 +299,26 @@
                 <div class="section-divider"></div>
                 <button style="background: #6c757d; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold;" onclick="logoutAdmin()">Logout</button>
             </div>
+        </div>
+
+        <!-- Footer Section with Copyright & Ownership -->
+        <div class="footer-section">
+            <div>© 2026 Otek Export & Panorama Cargo Logistics. All Rights Reserved.</div>
+            <div class="developer-tag">System Developed & Maintained by <strong>tera_web service</strong></div>
+            <div class="footer-links">
+                <a onclick="showPolicy('terms')">Terms of Service</a>
+                <span>|</span>
+                <a onclick="showPolicy('privacy')">Privacy Policy</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Policy Modal Popup -->
+    <div id="policyModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:1000; justify-content:center; align-items:center;">
+        <div style="background:white; padding:25px; border-radius:12px; max-width:600px; width:90%; max-height:80vh; overflow-y:auto; box-shadow:0 10px 30px rgba(0,0,0,0.3);">
+            <h3 id="modalTitle" style="margin-top:0; color:#0b253a;"></h3>
+            <div id="modalBody" style="font-size:14px; line-height:1.6; color:#333;"></div>
+            <button onclick="closeModal()" style="margin-top:20px; background:#6c757d; color:white; border:none; padding:10px 20px; border-radius:6px; cursor:pointer; font-weight:bold; width:100%;">Close</button>
         </div>
     </div>
 
@@ -442,6 +496,34 @@
             } else {
                 div.innerHTML = "<p style='color:red; text-align:center; padding:10px;'>" + data.message + "</p>";
             }
+        }
+
+        // Policy Modal Logic
+        function showPolicy(type) {
+            const modal = document.getElementById('policyModal');
+            const title = document.getElementById('modalTitle');
+            const body = document.getElementById('modalBody');
+
+            if (type === 'terms') {
+                title.innerText = 'Terms of Service';
+                body.innerHTML = `
+                    <p><b>1. Cargo Tracking Service:</b> The information provided on this system is based on live shipping manifests. Delivery times and clearing dates are subject to port and customs procedures in Sri Lanka.</p>
+                    <p><b>2. Payments:</b> All freight and clearing charges must be deposited only to our official bank accounts listed on this page (Panorama Cargo Logistics in Sri Lanka or Otek Motor Export Co., Ltd in Japan).</p>
+                    <p><b>3. Purpose Reference:</b> Customers must mention their Invoice Number and BL Number in the transaction remarks for quick verification.</p>
+                `;
+            } else if (type === 'privacy') {
+                title.innerText = 'Privacy Policy';
+                body.innerHTML = `
+                    <p><b>1. Data Security:</b> Customer details including Invoice Number, Name, and Cargo Status are stored securely and used solely for tracking and logistics coordination.</p>
+                    <p><b>2. Data Protection:</b> Personal information is never shared with unauthorized third parties.</p>
+                    <p><b>3. Maintenance:</b> System infrastructure and security are monitored and maintained by tera_web service.</p>
+                `;
+            }
+            modal.style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('policyModal').style.display = 'none';
         }
 
         function verifyPassword() {
