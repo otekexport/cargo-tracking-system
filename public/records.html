@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>All Cargo Records - Admin</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            background: #0b253a; 
+            color: #333; 
+            margin: 0; 
+            padding: 20px; 
+        }
+        .container { 
+            max-width: 1000px; 
+            margin: 0 auto; 
+            background: rgba(255, 255, 255, 0.96); 
+            padding: 25px; 
+            border-radius: 12px; 
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3); 
+        }
+        h2 { 
+            margin-top: 0; 
+            color: #007bff; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+        }
+        .controls { 
+            display: flex; 
+            justify-content: space-between; 
+            margin-bottom: 15px; 
+            gap: 10px; 
+            flex-wrap: wrap;
+        }
+        input[type="text"] { 
+            padding: 10px; 
+            border: 1px solid #ccc; 
+            border-radius: 6px; 
+            width: 280px; 
+            font-size: 14px;
+        }
+        button { 
+            padding: 10px 16px; 
+            border: none; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-weight: bold; 
+            font-size: 14px;
+        }
+        .btn-refresh { background: #17a2b8; color: white; }
+        .btn-delete { background: #dc3545; color: white; padding: 6px 12px; font-size: 12px; }
+        .btn-delete:hover { background: #bd2130; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #007bff; color: white; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        tr:hover { background-color: #f1f1f1; }
+        .status-badge { 
+            padding: 4px 8px; 
+            border-radius: 4px; 
+            font-weight: bold; 
+            font-size: 12px; 
+            background: #e2e3e5; 
+            color: #383d41; 
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>
+            <span>📦 All Cargo Records</span>
+            <button class="btn-refresh" onclick="loadData()">🔄 Refresh Data</button>
+        </h2>
+        
+        <div class="controls">
+            <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="🔍 Search Invoice, Name, Dest...">
+            <div id="countBadge" style="font-weight: bold; align-self: center; color: #007bff; font-size: 15px;">Total Records: 0</div>
+        </div>
+
+        <div style="overflow-x: auto;">
+            <table id="recordsTable">
+                <thead>
+                    <tr>
+                        <th>Invoice Number</th>
+                        <th>Customer Name</th>
+                        <th>Status</th>
+                        <th>Destination</th>
+                        <th>Last Updated</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    <tr><td colspan="6" style="text-align:center;">Loading records...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let adminPassword = sessionStorage.getItem('adminPassword') || "";
+
+        if (!adminPassword) {
+            adminPassword = prompt("Please enter Admin Password to view records:");
+            if (adminPassword) {
+                sessionStorage.setItem('adminPassword', adminPassword);
+            }
+        }
+
+        async function loadData() {
+            if (!adminPassword) {
+                alert("Admin Password is required!");
+                return;
+            }
+
+            const res = await fetch('/api/admin/all', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ admin_password: adminPassword })
+            });
+
+            const result = await res.json();
+            const tbody = document.getElementById('tableBody');
+
+            if (result.success) {
+                document.getElementById('countBadge').innerText = `Total Records: ${result.data.length}`;
+                
+                if (result.data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">No records found in database.</td></tr>`;
+                    return;
+                }
+
+                let html = '';
+                result.data.forEach(row => {
+                    html += `<tr>
+                        <td><b>${row.invoice_number}</b></td>
+                        <td>${row.customer_name || '-'}</td>
+                        <td><span class="status-badge">${row.status || '-'}</span></td>
+                        <td>${row.destination || '-'}</td>
+                        <td>${row.updated_at || '-'}</td>
+                        <td>
+                            <button class="btn-delete" onclick="deleteRecord('${row.invoice_number}')">🗑️ Delete</button>
+                        </td>
+                    </tr>`;
+                });
+                tbody.innerHTML = html;
+            } else {
+                alert(result.message);
+                if (result.message === 'Invalid Admin Password!') {
+                    sessionStorage.removeItem('adminPassword');
+                    location.reload();
+                }
+            }
+        }
+
+        async function deleteRecord(invoice) {
+            if (!confirm(`Are you sure you want to delete Invoice ${invoice}?`)) return;
+
+            const res = await fetch('/api/admin/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    admin_password: adminPassword,
+                    invoice_number: invoice
+                })
+            });
+
+            const result = await res.json();
+            if (result.success) {
+                alert(result.message);
+                loadData(); // Delete වූ පසු auto refresh වේ
+            } else {
+                alert(result.message);
+            }
+        }
+
+        function filterTable() {
+            const input = document.getElementById("searchInput").value.toUpperCase();
+            const rows = document.getElementById("tableBody").getElementsByTagName("tr");
+
+            for (let i = 0; i < rows.length; i++) {
+                const txt = rows[i].textContent || rows[i].innerText;
+                if (txt.toUpperCase().indexOf(input) > -1) {
+                    rows[i].style.display = "";
+                } else {
+                    rows[i].style.display = "none";
+                }
+            }
+        }
+
+        // Auto load on open
+        loadData();
+    </script>
+</body>
+</html>
