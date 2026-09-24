@@ -5,24 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cargo Management System</title>
     <style>
-        /* Full Background CSS */
         body { 
-    font-family: Arial, sans-serif; 
-    margin: 0; 
-    padding: 20px; 
-    min-height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    
-    /* Dark Sea Blue Background Color */
-    background: #0b253a; /* හෝ gradients අවශ්‍ය නම්: linear-gradient(135deg, #0b253a, #134074); */
-}
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #0b253a;
+        }
 
-        /* Card / Box styling (Semi-transparent for readability) */
         .card { 
-            background: rgba(255, 255, 255, 0.92); /* Background එක ලාවට පෙනෙන transparent සුදු පැහැය */
-            backdrop-filter: blur(8px);             /* Glass Blur effect එක */
+            background: rgba(255, 255, 255, 0.95); 
+            backdrop-filter: blur(8px);
             padding: 30px; 
             border-radius: 16px; 
             box-shadow: 0 8px 32px rgba(0,0,0,0.3); 
@@ -40,8 +36,9 @@
         button.submit-btn { width: 100%; padding: 10px; font-size: 16px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; margin-top: 10px; }
         button.admin-btn { background: #007bff; }
         button.bulk-btn { background: #6f42c1; }
+        button.delete-btn { background: #dc3545; }
         .section-divider { border-top: 1px solid #ddd; margin: 20px 0; }
-        #result, #msg, #loginMsg, #bulkMsg { margin-top: 12px; font-weight: bold; text-align: center; font-size: 14px; }
+        #result, #msg, #loginMsg, #bulkMsg, #deleteMsg { margin-top: 12px; font-weight: bold; text-align: center; font-size: 14px; }
     </style>
 </head>
 <body>
@@ -76,6 +73,7 @@
 
             <!-- Admin Forms -->
             <div id="adminUpdateForm" style="display: none;">
+                <!-- Single Cargo Update -->
                 <h4 style="margin: 0 0 5px 0;">Single Cargo Update</h4>
                 <label>Invoice Number:</label>
                 <input type="text" id="inv" placeholder="INV-1001">
@@ -90,6 +88,16 @@
 
                 <div class="section-divider"></div>
 
+                <!-- Delete Cargo Section -->
+                <h4 style="margin: 0 0 5px 0; color: #dc3545;">Delete Cargo Record</h4>
+                <label>Invoice Number to Delete:</label>
+                <input type="text" id="deleteInv" placeholder="e.g. INV-1001">
+                <button class="submit-btn delete-btn" onclick="deleteShipment()">Delete Record</button>
+                <div id="deleteMsg"></div>
+
+                <div class="section-divider"></div>
+
+                <!-- Bulk CSV Upload -->
                 <h4 style="margin: 0 0 5px 0;">Bulk Upload (CSV File)</h4>
                 <label>Select CSV File:</label>
                 <input type="file" id="csvFile" accept=".csv">
@@ -97,7 +105,7 @@
                 <div id="bulkMsg"></div>
 
                 <div class="section-divider"></div>
-                <button style="background: #dc3545; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold;" onclick="logoutAdmin()">Logout</button>
+                <button style="background: #6c757d; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold;" onclick="logoutAdmin()">Logout</button>
             </div>
         </div>
     </div>
@@ -170,6 +178,34 @@
             } else {
                 msgDiv.style.color = "red";
                 msgDiv.innerText = result.message || "Error updating shipment!";
+                if(result.message === 'Invalid Admin Password!') logoutAdmin();
+            }
+        }
+
+        async function deleteShipment() {
+            const inv = document.getElementById('deleteInv').value.trim();
+            if(!inv) return alert('Please enter Invoice Number to delete');
+
+            if(!confirm(`Are you sure you want to delete Invoice ${inv}?`)) return;
+
+            const res = await fetch('/api/admin/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    admin_password: currentAdminPassword,
+                    invoice_number: inv
+                })
+            });
+
+            const result = await res.json();
+            const deleteMsg = document.getElementById('deleteMsg');
+            if(result.success) {
+                deleteMsg.style.color = "green";
+                deleteMsg.innerText = result.message;
+                document.getElementById('deleteInv').value = "";
+            } else {
+                deleteMsg.style.color = "red";
+                deleteMsg.innerText = result.message || "Error deleting shipment!";
                 if(result.message === 'Invalid Admin Password!') logoutAdmin();
             }
         }
