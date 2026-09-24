@@ -236,7 +236,8 @@
 
             <h3 style="margin-top:0; color:#28a745; text-align: center;">Otek Export Customer Tracking</h3>
             <label>Invoice Number:</label>
-            <input type="text" id="invoice" placeholder="e.g. INV-1001">
+            <!-- Enter key triggers track() -->
+            <input type="text" id="invoice" placeholder="e.g. INV-1001" onkeypress="if(event.key === 'Enter') track()">
             <button class="submit-btn" onclick="track()">Track Status</button>
             <div id="result"></div>
         </div>
@@ -248,7 +249,8 @@
             <!-- Login Form -->
             <div id="adminLoginForm">
                 <label>Admin Password:</label>
-                <input type="password" id="adminPassword" placeholder="Enter Password">
+                <!-- Enter key triggers verifyPassword() -->
+                <input type="password" id="adminPassword" placeholder="Enter Password" onkeypress="if(event.key === 'Enter') verifyPassword()">
                 <button class="submit-btn admin-btn" onclick="verifyPassword()">Login to Admin</button>
                 <div id="loginMsg"></div>
             </div>
@@ -264,17 +266,17 @@
                 <!-- Single Cargo Update -->
                 <h4 style="margin: 0 0 5px 0;">Single Cargo Update</h4>
                 <label>Arrival Date:</label>
-                <input type="text" id="arrivalDate" placeholder="e.g. October 20, 2026">
+                <input type="text" id="arrivalDate" placeholder="e.g. October 20, 2026" onkeypress="if(event.key === 'Enter') updateShipment()">
                 <label>Clearing Warehouse:</label>
-                <input type="text" id="clearingWarehouse" placeholder="e.g. Laksiri Warehouse in Peliyagoda">
+                <input type="text" id="clearingWarehouse" placeholder="e.g. Laksiri Warehouse in Peliyagoda" onkeypress="if(event.key === 'Enter') updateShipment()">
                 <label>Invoice Number:</label>
-                <input type="text" id="inv" placeholder="INV-1001">
+                <input type="text" id="inv" placeholder="INV-1001" onkeypress="if(event.key === 'Enter') updateShipment()">
                 <label>Customer Name:</label>
-                <input type="text" id="name" placeholder="Kamal Perera">
+                <input type="text" id="name" placeholder="Kamal Perera" onkeypress="if(event.key === 'Enter') updateShipment()">
                 <label>Status:</label>
-                <input type="text" id="status" placeholder="In Transit / Delivered">
+                <input type="text" id="status" placeholder="In Transit / Delivered" onkeypress="if(event.key === 'Enter') updateShipment()">
                 <label>Destination:</label>
-                <input type="text" id="dest" placeholder="Colombo">
+                <input type="text" id="dest" placeholder="Colombo" onkeypress="if(event.key === 'Enter') updateShipment()">
                 <button class="submit-btn admin-btn" onclick="updateShipment()">Save Single Status</button>
                 <div id="msg"></div>
 
@@ -283,7 +285,7 @@
                 <!-- Delete Cargo Section -->
                 <h4 style="margin: 0 0 5px 0; color: #dc3545;">Delete Cargo Record</h4>
                 <label>Invoice Number to Delete:</label>
-                <input type="text" id="deleteInv" placeholder="e.g. INV-1001">
+                <input type="text" id="deleteInv" placeholder="e.g. INV-1001" onkeypress="if(event.key === 'Enter') deleteShipment()">
                 <button class="submit-btn delete-btn" onclick="deleteShipment()">Delete Record</button>
                 <div id="deleteMsg"></div>
 
@@ -433,7 +435,7 @@
                                 <b>Branch Name:</b> Panchikawatta Branch
                             </div>
                             <div class="bank-note">
-                                📌 <b>Note:</b> Please make all your cash deposits / online fund transfers to the above bank account & submit the deposit slip with your Invoice at our whatsapp numbers.<br>
+                                📌 <b>Note:</b> Please make all your cash deposits / online fund transfers to the above bank account & submit the deposit slip with your Invoice at our counter.<br>
                                 ⚠️ <b>Important:</b> Please mention your Invoice No. & BL No. in the 'Purpose' column. (This will help us track your payment quickly.)
                             </div>
                         </div>
