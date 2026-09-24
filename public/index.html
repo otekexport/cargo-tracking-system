@@ -17,7 +17,7 @@
             overflow-x: hidden;
         }
 
-        /* Canvas Background for Falling Gold Stars */
+        /* Canvas Background for Falling Gold Stars & Logos */
         #starCanvas {
             position: fixed;
             top: 0;
@@ -349,7 +349,7 @@
 </head>
 <body>
 
-    <!-- Falling Gold Stars Canvas Background -->
+    <!-- Falling Gold Stars & Logos Canvas Background -->
     <canvas id="starCanvas"></canvas>
 
     <div class="card">
@@ -453,10 +453,14 @@
     </div>
 
     <script>
-        // 🌟 Falling Gold Stars Animation Logic
+        // 🌟 Falling Gold Stars & Otek Logos Canvas Background
         const canvas = document.getElementById('starCanvas');
         const ctx = canvas.getContext('2d');
         let stars = [];
+
+        // Load Otek Logo Image for background animation
+        const logoImg = new Image();
+        logoImg.src = 'logo.png';
 
         function resizeCanvas() {
             canvas.width = window.innerWidth;
@@ -467,15 +471,17 @@
 
         function createStars() {
             stars = [];
-            const count = Math.floor(window.innerWidth / 12);
+            const count = Math.floor(window.innerWidth / 10);
             for (let i = 0; i < count; i++) {
+                const isLogo = (i % 6 === 0); // 1 out of every 6 floating particles is a small Otek Logo
                 stars.push({
+                    isLogo: isLogo,
                     x: Math.random() * canvas.width,
                     y: Math.random() * canvas.height,
-                    size: Math.random() * 2.5 + 1,
+                    size: isLogo ? (Math.random() * 12 + 20) : (Math.random() * 2.5 + 1), // Logo size: 20px-32px, Star size: 1px-3.5px
                     speedY: Math.random() * 1.2 + 0.3,
                     speedX: (Math.random() - 0.5) * 0.4,
-                    opacity: Math.random(),
+                    opacity: Math.random() * 0.7 + 0.3,
                     fadeSpeed: Math.random() * 0.02 + 0.005,
                     color: Math.random() > 0.3 ? '#FFD700' : '#FFF8DC'
                 });
@@ -486,13 +492,22 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             stars.forEach(s => {
                 ctx.save();
-                ctx.beginPath();
-                ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
-                ctx.fillStyle = s.color;
                 ctx.globalAlpha = s.opacity;
-                ctx.shadowBlur = 10;
-                ctx.shadowColor = '#FFD700';
-                ctx.fill();
+
+                if (s.isLogo && logoImg.complete && logoImg.naturalWidth !== 0) {
+                    // Draw floating small Otek logo maintaining aspect ratio
+                    const aspect = logoImg.naturalHeight / logoImg.naturalWidth;
+                    ctx.drawImage(logoImg, s.x, s.y, s.size, s.size * aspect);
+                } else {
+                    // Draw glowing gold star
+                    ctx.beginPath();
+                    ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+                    ctx.fillStyle = s.color;
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = '#FFD700';
+                    ctx.fill();
+                }
+
                 ctx.restore();
 
                 s.y += s.speedY;
@@ -504,7 +519,7 @@
                 }
 
                 if (s.y > canvas.height) {
-                    s.y = -10;
+                    s.y = -30;
                     s.x = Math.random() * canvas.width;
                 }
             });
