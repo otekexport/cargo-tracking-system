@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cargo Management System</title>
+    <title>Otek Export Cargo System</title>
     <style>
         body { 
             font-family: Arial, sans-serif; 
@@ -57,6 +57,14 @@
         }
         .result-item strong {
             color: #0b253a;
+        }
+
+        /* Logo Styling */
+        .brand-logo {
+            max-width: 180px;
+            height: auto;
+            display: block;
+            margin: 0 auto 15px auto;
         }
 
         /* WhatsApp Section Styling */
@@ -120,7 +128,10 @@
 
         <!-- Tab 1: Customer View -->
         <div id="customer" class="tab-content active">
-            <h3 style="margin-top:0; color:#28a745; text-align: center;">Customer Tracking</h3>
+            <!-- Otek Export Logo -->
+            <img src="logo.png" alt="Otek Export Logo" class="brand-logo" onerror="this.style.display='none'">
+
+            <h3 style="margin-top:0; color:#28a745; text-align: center;">Otek Export Customer Tracking</h3>
             <label>Invoice Number:</label>
             <input type="text" id="invoice" placeholder="e.g. INV-1001">
             <button class="submit-btn" onclick="track()">Track Status</button>
