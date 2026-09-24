@@ -16,7 +16,6 @@
             background: #0b253a;
         }
 
-        /* Full Page Width Layout */
         .card { 
             background: rgba(255, 255, 255, 0.95); 
             backdrop-filter: blur(8px);
@@ -44,7 +43,6 @@
         button.view-page-btn { background: #17a2b8; }
         .section-divider { border-top: 1px solid #ddd; margin: 25px 0; }
         
-        /* Result Display Box Formatting */
         #result { margin-top: 18px; font-size: 15px; line-height: 1.6; word-break: break-word; }
         .result-box {
             background: #f8f9fa;
@@ -103,6 +101,10 @@
 
                 <!-- Single Cargo Update -->
                 <h4 style="margin: 0 0 5px 0;">Single Cargo Update</h4>
+                <label>Arrival Date:</label>
+                <input type="text" id="arrivalDate" placeholder="e.g. October 20, 2026">
+                <label>Clearing Warehouse:</label>
+                <input type="text" id="clearingWarehouse" placeholder="e.g. Laksiri Warehouse in Peliyagoda">
                 <label>Invoice Number:</label>
                 <input type="text" id="inv" placeholder="INV-1001">
                 <label>Customer Name:</label>
@@ -160,8 +162,11 @@
             if(data.success) {
                 div.innerHTML = `
                     <div class="result-box">
+                        <div class="result-item"><strong>Arrival Date:</strong> ${data.data.arrival_date || '-'}</div>
+                        <div class="result-item"><strong>Clearing Warehouse:</strong> ${data.data.clearing_warehouse || '-'}</div>
+                        <div class="result-item"><strong>Invoice Number:</strong> ${data.data.invoice_number || '-'}</div>
+                        <div class="result-item"><strong>Customer Name:</strong> ${data.data.customer_name || '-'}</div>
                         <div class="result-item"><strong>Status:</strong> ${data.data.status || '-'}</div>
-                        <div class="result-item"><strong>Customer:</strong> ${data.data.customer_name || '-'}</div>
                         <div class="result-item"><strong>Destination:</strong> ${data.data.destination || '-'}</div>
                     </div>
                 `;
@@ -196,6 +201,8 @@
         async function updateShipment() {
             const data = {
                 admin_password: currentAdminPassword,
+                arrival_date: document.getElementById('arrivalDate').value,
+                clearing_warehouse: document.getElementById('clearingWarehouse').value,
                 invoice_number: document.getElementById('inv').value,
                 customer_name: document.getElementById('name').value,
                 status: document.getElementById('status').value,
@@ -265,15 +272,16 @@
                     const line = lines[i].trim();
                     if (!line) continue;
                     
-                    // Regex split for commas inside quotes
                     const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/^"\vert{}"$/g, ''));
 
-                    if (cols.length >= 1 && cols[0]) {
+                    if (cols.length >= 3 && cols[2]) {
                         shipments.push({
-                            invoice_number: cols[0],
-                            customer_name: cols[1] || '',
-                            status: cols[2] || '',
-                            destination: cols[3] || ''
+                            arrival_date: cols[0] || '',
+                            clearing_warehouse: cols[1] || '',
+                            invoice_number: cols[2] || '',
+                            customer_name: cols[3] || '',
+                            status: cols[4] || '',
+                            destination: cols[5] || ''
                         });
                     }
                 }
