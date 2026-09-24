@@ -24,9 +24,10 @@
             border-radius: 16px; 
             box-shadow: 0 8px 32px rgba(0,0,0,0.3); 
             width: 92%; 
-            max-width: 1000px; /* Screen එක පුරා පලල්ව පෙනෙන ලෙස සකසා ඇත */
+            max-width: 1000px;
             text-align: left; 
             margin-top: 20px;
+            box-sizing: border-box;
         }
 
         .nav-buttons { display: flex; justify-content: space-around; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
@@ -42,7 +43,24 @@
         button.delete-btn { background: #dc3545; }
         button.view-page-btn { background: #17a2b8; }
         .section-divider { border-top: 1px solid #ddd; margin: 25px 0; }
-        #result, #msg, #loginMsg, #bulkMsg, #deleteMsg { margin-top: 12px; font-weight: bold; text-align: center; font-size: 14px; }
+        
+        /* Result Display Box Formatting */
+        #result { margin-top: 18px; font-size: 15px; line-height: 1.6; word-break: break-word; }
+        .result-box {
+            background: #f8f9fa;
+            border-left: 5px solid #28a745;
+            padding: 18px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .result-item {
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+        .result-item strong {
+            color: #0b253a;
+        }
+        #msg, #loginMsg, #bulkMsg, #deleteMsg { margin-top: 12px; font-weight: bold; text-align: center; font-size: 14px; }
     </style>
 </head>
 <body>
@@ -140,9 +158,15 @@
             const data = await res.json();
             const div = document.getElementById('result');
             if(data.success) {
-                div.innerHTML = "<p style='color:green;'>Status: " + data.data.status + "<br>Customer: " + data.data.customer_name + "<br>Destination: " + data.data.destination + "</p>";
+                div.innerHTML = `
+                    <div class="result-box">
+                        <div class="result-item"><strong>Status:</strong> ${data.data.status || '-'}</div>
+                        <div class="result-item"><strong>Customer:</strong> ${data.data.customer_name || '-'}</div>
+                        <div class="result-item"><strong>Destination:</strong> ${data.data.destination || '-'}</div>
+                    </div>
+                `;
             } else {
-                div.innerHTML = "<p style='color:red;'>" + data.message + "</p>";
+                div.innerHTML = "<p style='color:red; text-align:center; padding:10px;'>" + data.message + "</p>";
             }
         }
 
@@ -240,7 +264,10 @@
                 for (let i = 1; i < lines.length; i++) {
                     const line = lines[i].trim();
                     if (!line) continue;
-                    const cols = line.split(',').map(c => c.trim());
+                    
+                    // Regex split for commas inside quotes
+                    const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/^"\vert{}"$/g, ''));
+
                     if (cols.length >= 1 && cols[0]) {
                         shipments.push({
                             invoice_number: cols[0],
