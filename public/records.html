@@ -13,7 +13,7 @@
             padding: 20px; 
         }
         .container { 
-            max-width: 1000px; 
+            max-width: 1050px; 
             margin: 0 auto; 
             background: rgba(255, 255, 255, 0.96); 
             padding: 25px; 
@@ -26,10 +26,13 @@
             display: flex; 
             justify-content: space-between; 
             align-items: center; 
+            flex-wrap: wrap;
+            gap: 10px;
         }
         .controls { 
             display: flex; 
             justify-content: space-between; 
+            align-items: center;
             margin-bottom: 15px; 
             gap: 10px; 
             flex-wrap: wrap;
@@ -50,6 +53,8 @@
             font-size: 14px;
         }
         .btn-refresh { background: #17a2b8; color: white; }
+        .btn-delete-selected { background: #dc3545; color: white; margin-left: 5px; }
+        .btn-delete-selected:hover { background: #bd2130; }
         .btn-delete { background: #dc3545; color: white; padding: 6px 12px; font-size: 12px; }
         .btn-delete:hover { background: #bd2130; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
@@ -66,6 +71,11 @@
             color: #383d41; 
             display: inline-block;
         }
+        input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -73,18 +83,22 @@
     <div class="container">
         <h2>
             <span>📦 All Cargo Records</span>
-            <button class="btn-refresh" onclick="loadData()">🔄 Refresh Data</button>
+            <div>
+                <button class="btn-refresh" onclick="loadData()">🔄 Refresh Data</button>
+                <button class="btn-delete-selected" onclick="deleteSelectedRecords()">🗑️ Delete Selected</button>
+            </div>
         </h2>
         
         <div class="controls">
             <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="🔍 Search Invoice, Name, Dest...">
-            <div id="countBadge" style="font-weight: bold; align-self: center; color: #007bff; font-size: 15px;">Total Records: 0</div>
+            <div id="countBadge" style="font-weight: bold; color: #007bff; font-size: 15px;">Total Records: 0</div>
         </div>
 
         <div style="overflow-x: auto;">
             <table id="recordsTable">
                 <thead>
                     <tr>
+                        <th style="width: 40px; text-align: center;"><input type="checkbox" id="selectAll" onclick="toggleSelectAll(this)"></th>
                         <th>Invoice Number</th>
                         <th>Customer Name</th>
                         <th>Status</th>
@@ -94,7 +108,7 @@
                     </tr>
                 </thead>
                 <tbody id="tableBody">
-                    <tr><td colspan="6" style="text-align:center;">Loading records...</td></tr>
+                    <tr><td colspan="7" style="text-align:center;">Loading records...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -116,6 +130,8 @@
                 return;
             }
 
+            document.getElementById('selectAll').checked = false;
+
             const res = await fetch('/api/admin/all', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -129,13 +145,14 @@
                 document.getElementById('countBadge').innerText = `Total Records: ${result.data.length}`;
                 
                 if (result.data.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">No records found in database.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;">No records found in database.</td></tr>`;
                     return;
                 }
 
                 let html = '';
                 result.data.forEach(row => {
                     html += `<tr>
+                        <td style="text-align:center;"><input type="checkbox" class="record-checkbox" value="${row.invoice_number}"></td>
                         <td><b>${row.invoice_number}</b></td>
                         <td>${row.customer_name || '-'}</td>
                         <td><span class="status-badge">${row.status || '-'}</span></td>
@@ -156,6 +173,44 @@
             }
         }
 
+        function toggleSelectAll(masterCheckbox) {
+            const checkboxes = document.querySelectorAll('.record-checkbox');
+            checkboxes.forEach(cb => {
+                if (cb.closest('tr').style.display !== 'none') {
+                    cb.checked = masterCheckbox.checked;
+                }
+            });
+        }
+
+        async function deleteSelectedRecords() {
+            const checkboxes = document.querySelectorAll('.record-checkbox:checked');
+            const selectedInvoices = Array.from(checkboxes).map(cb => cb.value);
+
+            if (selectedInvoices.length === 0) {
+                alert("Please select at least one record to delete!");
+                return;
+            }
+
+            if (!confirm(`Are you sure you want to delete ${selectedInvoices.length} selected record(s)?`)) return;
+
+            const res = await fetch('/api/admin/delete-multiple', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    admin_password: adminPassword,
+                    invoice_numbers: selectedInvoices
+                })
+            });
+
+            const result = await res.json();
+            if (result.success) {
+                alert(result.message);
+                loadData();
+            } else {
+                alert(result.message);
+            }
+        }
+
         async function deleteRecord(invoice) {
             if (!confirm(`Are you sure you want to delete Invoice ${invoice}?`)) return;
 
@@ -171,7 +226,7 @@
             const result = await res.json();
             if (result.success) {
                 alert(result.message);
-                loadData(); // Delete වූ පසු auto refresh වේ
+                loadData();
             } else {
                 alert(result.message);
             }
