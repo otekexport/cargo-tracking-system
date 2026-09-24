@@ -4,7 +4,7 @@ const bodyParser = require('body-parser');
 const path = require('path');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 // Admin Password
 const ADMIN_PASSWORD = 'admin123';
@@ -64,6 +64,27 @@ app.post('/api/admin/update', (req, res) => {
     });
 });
 
+// Admin Delete API
+app.post('/api/admin/delete', (req, res) => {
+    const { admin_password, invoice_number } = req.body;
+
+    if (admin_password !== ADMIN_PASSWORD) {
+        return res.json({ success: false, message: 'Invalid Admin Password!' });
+    }
+
+    if (!invoice_number) {
+        return res.json({ success: false, message: 'Invoice Number is required!' });
+    }
+
+    db.run('DELETE FROM shipments WHERE invoice_number = ?', [invoice_number], function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        if (this.changes === 0) {
+            return res.json({ success: false, message: 'Invoice Number not found in database!' });
+        }
+        res.json({ success: true, message: `Invoice ${invoice_number} successfully deleted!` });
+    });
+});
+
 // Admin Bulk Upload API
 app.post('/api/admin/bulk-update', (req, res) => {
     const { admin_password, shipments } = req.body;
@@ -105,5 +126,5 @@ app.post('/api/admin/bulk-update', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log('Server is running at http://localhost:' + PORT);
+    console.log('Server is running at port ' + PORT);
 });
