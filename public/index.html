@@ -13,20 +13,33 @@
             display: flex;
             justify-content: center;
             align-items: flex-start;
-            background: #0b253a;
+            background: linear-gradient(135deg, #05131f, #0b253a, #113856);
+            overflow-x: hidden;
+        }
+
+        /* Canvas Background for Falling Gold Stars */
+        #starCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -1;
+            pointer-events: none;
         }
 
         .card { 
-            background: rgba(255, 255, 255, 0.95); 
-            backdrop-filter: blur(8px);
+            background: rgba(255, 255, 255, 0.96); 
+            backdrop-filter: blur(10px);
             padding: 30px; 
             border-radius: 16px; 
-            box-shadow: 0 8px 32px rgba(0,0,0,0.3); 
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5), 0 0 20px rgba(255, 215, 0, 0.15); 
             width: 92%; 
             max-width: 1000px;
             text-align: left; 
             margin-top: 20px;
             box-sizing: border-box;
+            border: 1px solid rgba(255, 215, 0, 0.2);
         }
 
         .nav-buttons { display: flex; justify-content: space-around; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
@@ -59,12 +72,29 @@
             color: #0b253a;
         }
 
-        /* Logo Styling */
         .brand-logo {
             max-width: 180px;
             height: auto;
             display: block;
             margin: 0 auto 15px auto;
+        }
+
+        /* Bank & Slip Section Styling */
+        .bank-card {
+            margin-top: 20px;
+            padding: 18px;
+            background: #f0f7ff;
+            border: 1px solid #b8daff;
+            border-radius: 12px;
+        }
+        .bank-details-box {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #d6e9c6;
+            margin-bottom: 15px;
+            font-size: 14px;
+            line-height: 1.7;
         }
 
         /* WhatsApp Section Styling */
@@ -114,10 +144,13 @@
             margin-top: 10px;
         }
 
-        #msg, #loginMsg, #bulkMsg, #deleteMsg { margin-top: 12px; font-weight: bold; text-align: center; font-size: 14px; }
+        #msg, #loginMsg, #bulkMsg, #deleteMsg, #slipMsg { margin-top: 12px; font-weight: bold; text-align: center; font-size: 14px; }
     </style>
 </head>
 <body>
+
+    <!-- Falling Gold Stars Canvas Background -->
+    <canvas id="starCanvas"></canvas>
 
     <div class="card">
         <!-- Navigation Tabs -->
@@ -200,9 +233,70 @@
     </div>
 
     <script>
+        // 🌟 Falling Gold Stars Animation Logic
+        const canvas = document.getElementById('starCanvas');
+        const ctx = canvas.getContext('2d');
+        let stars = [];
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function createStars() {
+            stars = [];
+            const count = Math.floor(window.innerWidth / 12);
+            for (let i = 0; i < count; i++) {
+                stars.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    size: Math.random() * 2.5 + 1,
+                    speedY: Math.random() * 1.2 + 0.3,
+                    speedX: (Math.random() - 0.5) * 0.4,
+                    opacity: Math.random(),
+                    fadeSpeed: Math.random() * 0.02 + 0.005,
+                    color: Math.random() > 0.3 ? '#FFD700' : '#FFF8DC' // Gold and Warm Glow
+                });
+            }
+        }
+
+        function drawStars() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            stars.forEach(s => {
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+                ctx.fillStyle = s.color;
+                ctx.globalAlpha = s.opacity;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = '#FFD700';
+                ctx.fill();
+                ctx.restore();
+
+                s.y += s.speedY;
+                s.x += s.speedX;
+                s.opacity += s.fadeSpeed;
+
+                if (s.opacity >= 1 || s.opacity <= 0.2) {
+                    s.fadeSpeed = -s.fadeSpeed;
+                }
+
+                if (s.y > canvas.height) {
+                    s.y = -10;
+                    s.x = Math.random() * canvas.width;
+                }
+            });
+            requestAnimationFrame(drawStars);
+        }
+
+        createStars();
+        drawStars();
+
+        // System Variables & Logic
         let currentAdminPassword = "";
 
-        // WhatsApp Numbers Configuration
         const WHATSAPP_NUMBER_1 = "94740784400";
         const WHATSAPP_NUMBER_2 = "94740304400";
         const WHATSAPP_NUMBER_3 = "94740104400";
@@ -224,6 +318,13 @@
             const data = await res.json();
             const div = document.getElementById('result');
             if(data.success) {
+                let slipStatusText = "";
+                if (data.data.payment_slip) {
+                    slipStatusText = `<div style="background:#d4edda; color:#155724; padding:10px; border-radius:6px; margin-top:10px; font-weight:bold; text-align:center;">
+                        ✅ Payment Slip Uploaded & Being Verified
+                    </div>`;
+                }
+
                 div.innerHTML = `
                     <div class="result-box">
                         <div class="result-item"><strong>Arrival Date:</strong> ${data.data.arrival_date || '-'}</div>
@@ -232,6 +333,27 @@
                         <div class="result-item"><strong>Customer Name:</strong> ${data.data.customer_name || '-'}</div>
                         <div class="result-item"><strong>Status:</strong> ${data.data.status || '-'}</div>
                         <div class="result-item"><strong>Destination:</strong> ${data.data.destination || '-'}</div>
+                    </div>
+
+                    <!-- Bank Details & Payment Slip Upload Box -->
+                    <div class="bank-card">
+                        <h4 style="margin:0 0 10px 0; color:#004085;">🏦 Bank Transfer Details & Receipt Upload</h4>
+                        
+                        <div class="bank-details-box">
+                            <b>Bank Name:</b> Commercial Bank PLC<br>
+                            <b>Account Name:</b> Otek Export / Panorama Cargo Logistics<br>
+                            <b>Account Number:</b> 1234 5678 9012<br>
+                            <b>Branch:</b> Colombo Main Branch
+                        </div>
+
+                        ${slipStatusText}
+
+                        <label style="margin-top:12px;">📤 Upload Your Bank Payment Slip / Receipt:</label>
+                        <input type="file" id="slipInput" accept="image/*,.pdf">
+                        <button class="submit-btn" style="background:#007bff;" onclick="uploadSlip('${data.data.invoice_number}')">
+                            Upload Bank Receipt
+                        </button>
+                        <div id="slipMsg"></div>
                     </div>
 
                     <!-- WhatsApp 3 Lines Contact Box -->
@@ -260,6 +382,37 @@
             } else {
                 div.innerHTML = "<p style='color:red; text-align:center; padding:10px;'>" + data.message + "</p>";
             }
+        }
+
+        async function uploadSlip(invoiceNum) {
+            const fileInput = document.getElementById('slipInput');
+            const file = fileInput.files[0];
+            if (!file) return alert('Please select a payment slip image first!');
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const base64Data = e.target.result;
+                const res = await fetch('/api/upload-slip', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        invoice_number: invoiceNum,
+                        slip_base64: base64Data
+                    })
+                });
+
+                const result = await res.json();
+                const slipMsg = document.getElementById('slipMsg');
+                if (result.success) {
+                    slipMsg.style.color = "green";
+                    slipMsg.innerText = result.message;
+                    fileInput.value = "";
+                } else {
+                    slipMsg.style.color = "red";
+                    slipMsg.innerText = result.message || "Slip upload failed!";
+                }
+            };
+            reader.readAsDataURL(file);
         }
 
         function verifyPassword() {
