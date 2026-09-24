@@ -12,34 +12,36 @@
             min-height: 100vh;
             display: flex;
             justify-content: center;
-            align-items: center;
+            align-items: flex-start;
             background: #0b253a;
         }
 
+        /* Full Page Width Layout */
         .card { 
             background: rgba(255, 255, 255, 0.95); 
             backdrop-filter: blur(8px);
-            padding: 25px; 
+            padding: 30px; 
             border-radius: 16px; 
             box-shadow: 0 8px 32px rgba(0,0,0,0.3); 
-            width: 380px; 
-            max-width: 95%;
+            width: 92%; 
+            max-width: 1000px; /* Screen එක පුරා පලල්ව පෙනෙන ලෙස සකසා ඇත */
             text-align: left; 
+            margin-top: 20px;
         }
 
         .nav-buttons { display: flex; justify-content: space-around; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
-        .nav-btn { background: none; border: none; font-size: 15px; font-weight: bold; cursor: pointer; color: #666; padding: 8px 12px; }
+        .nav-btn { background: none; border: none; font-size: 16px; font-weight: bold; cursor: pointer; color: #666; padding: 10px 18px; }
         .nav-btn.active { color: #007bff; border-bottom: 3px solid #007bff; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
-        label { font-size: 13px; font-weight: bold; color: #333; display: block; margin-top: 10px; }
-        input[type="text"], input[type="password"], input[type="file"] { width: 100%; padding: 10px; margin: 4px 0 10px 0; font-size: 14px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; }
-        button.submit-btn { width: 100%; padding: 10px; font-size: 15px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; margin-top: 10px; font-weight: bold; }
+        label { font-size: 14px; font-weight: bold; color: #333; display: block; margin-top: 12px; }
+        input[type="text"], input[type="password"], input[type="file"] { width: 100%; padding: 12px; margin: 6px 0 12px 0; font-size: 14px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; }
+        button.submit-btn { width: 100%; padding: 12px; font-size: 16px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; margin-top: 10px; font-weight: bold; }
         button.admin-btn { background: #007bff; }
         button.bulk-btn { background: #6f42c1; }
         button.delete-btn { background: #dc3545; }
         button.view-page-btn { background: #17a2b8; }
-        .section-divider { border-top: 1px solid #ddd; margin: 20px 0; }
+        .section-divider { border-top: 1px solid #ddd; margin: 25px 0; }
         #result, #msg, #loginMsg, #bulkMsg, #deleteMsg { margin-top: 12px; font-weight: bold; text-align: center; font-size: 14px; }
     </style>
 </head>
@@ -113,7 +115,7 @@
                 <div id="bulkMsg"></div>
 
                 <div class="section-divider"></div>
-                <button style="background: #6c757d; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold;" onclick="logoutAdmin()">Logout</button>
+                <button style="background: #6c757d; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold;" onclick="logoutAdmin()">Logout</button>
             </div>
         </div>
     </div>
@@ -149,7 +151,7 @@
             if(!pass) return alert('Please enter password');
 
             currentAdminPassword = pass;
-            sessionStorage.setItem('adminPassword', pass); // Store for new page
+            sessionStorage.setItem('adminPassword', pass);
             document.getElementById('adminLoginForm').style.display = 'none';
             document.getElementById('adminUpdateForm').style.display = 'block';
             document.getElementById('loginMsg').innerText = '';
