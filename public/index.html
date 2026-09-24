@@ -264,49 +264,71 @@
 
             const reader = new FileReader();
             reader.onload = async function(e) {
-                const text = e.target.result;
-                const lines = text.split('\n');
-                const shipments = [];
+                try {
+                    const text = e.target.result;
+                    const lines = text.split(/\r?\n/);
+                    const shipments = [];
 
-                for (let i = 1; i < lines.length; i++) {
-                    const line = lines[i].trim();
-                    if (!line) continue;
-                    
-                    const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/^"\vert{}"$/g, ''));
+                    for (let i = 1; i < lines.length; i++) {
+                        const line = lines[i].trim();
+                        if (!line) continue;
+                        
+                        const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/^"\vert{}"$/g, ''));
 
-                    if (cols.length >= 3 && cols[2]) {
-                        shipments.push({
-                            arrival_date: cols[0] || '',
-                            clearing_warehouse: cols[1] || '',
-                            invoice_number: cols[2] || '',
-                            customer_name: cols[3] || '',
-                            status: cols[4] || '',
-                            destination: cols[5] || ''
-                        });
+                        // Smart detection for 4-column (old) vs 6-column (new) CSVs
+                        if (cols.length >= 4) {
+                            if (cols.length >= 6 || isNaN(Number(cols[0]))) {
+                                // 6 Columns: arrival_date, clearing_warehouse, invoice_number, customer_name, status, destination
+                                if (cols[2]) {
+                                    shipments.push({
+                                        arrival_date: cols[0] || '',
+                                        clearing_warehouse: cols[1] || '',
+                                        invoice_number: cols[2] || '',
+                                        customer_name: cols[3] || '',
+                                        status: cols[4] || '',
+                                        destination: cols[5] || ''
+                                    });
+                                }
+                            } else {
+                                // 4 Columns: invoice_number, customer_name, status, destination
+                                if (cols[0]) {
+                                    shipments.push({
+                                        arrival_date: '',
+                                        clearing_warehouse: '',
+                                        invoice_number: cols[0] || '',
+                                        customer_name: cols[1] || '',
+                                        status: cols[2] || '',
+                                        destination: cols[3] || ''
+                                    });
+                                }
+                            }
+                        }
                     }
-                }
 
-                if (shipments.length === 0) return alert('No valid data found in CSV!');
+                    if (shipments.length === 0) return alert('No valid data found in CSV!');
 
-                const res = await fetch('/api/admin/bulk-update', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        admin_password: currentAdminPassword,
-                        shipments: shipments
-                    })
-                });
+                    const res = await fetch('/api/admin/bulk-update', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            admin_password: currentAdminPassword,
+                            shipments: shipments
+                        })
+                    });
 
-                const result = await res.json();
-                const bulkMsg = document.getElementById('bulkMsg');
-                if(result.success) {
-                    bulkMsg.style.color = "green";
-                    bulkMsg.innerText = result.message;
-                    fileInput.value = "";
-                } else {
-                    bulkMsg.style.color = "red";
-                    bulkMsg.innerText = result.message || "Bulk update failed!";
-                    if(result.message === 'Invalid Admin Password!') logoutAdmin();
+                    const result = await res.json();
+                    const bulkMsg = document.getElementById('bulkMsg');
+                    if(result.success) {
+                        bulkMsg.style.color = "green";
+                        bulkMsg.innerText = result.message;
+                        fileInput.value = "";
+                    } else {
+                        bulkMsg.style.color = "red";
+                        bulkMsg.innerText = result.message || "Bulk update failed!";
+                        if(result.message === 'Invalid Admin Password!') logoutAdmin();
+                    }
+                } catch (err) {
+                    alert('CSV file read error: ' + err.message);
                 }
             };
             reader.readAsText(file);
