@@ -18,16 +18,20 @@ const db = new sqlite3.Database(path.join(__dirname, 'cargo.db'), (err) => {
     console.log('Database connected successfully.');
 });
 
-// Create Table with new fields
-db.run(`CREATE TABLE IF NOT EXISTS shipments (
-    invoice_number TEXT PRIMARY KEY,
-    arrival_date TEXT,
-    clearing_warehouse TEXT,
-    customer_name TEXT,
-    status TEXT,
-    destination TEXT,
-    updated_at TEXT
-)`);
+// Create Table & Safely Add New Columns if they don't exist
+db.serialize(() => {
+    db.run(`CREATE TABLE IF NOT EXISTS shipments (
+        invoice_number TEXT PRIMARY KEY,
+        customer_name TEXT,
+        status TEXT,
+        destination TEXT,
+        updated_at TEXT
+    )`);
+
+    // Add new columns if missing in existing database
+    db.run(`ALTER TABLE shipments ADD COLUMN arrival_date TEXT`, (err) => {});
+    db.run(`ALTER TABLE shipments ADD COLUMN clearing_warehouse TEXT`, (err) => {});
+});
 
 // Customer Track API
 app.get('/api/track/:invoice', (req, res) => {
@@ -37,7 +41,7 @@ app.get('/api/track/:invoice', (req, res) => {
         if (row) {
             res.json({ success: true, data: row });
         } else {
-            res.json({ success: false, message: 'Invoice Number hittades inte!' });
+            res.json({ success: false, message: 'Invoice Number eka hambawune na!' });
         }
     });
 });
@@ -149,18 +153,20 @@ app.post('/api/admin/bulk-update', (req, res) => {
 
     db.serialize(() => {
         db.run('BEGIN TRANSACTION');
-        const stmt = db.prepare(query);
+        const stmt = db.prepare(query, (err) => {
+            if (err) console.error("Prepare Error:", err);
+        });
 
         shipments.forEach(item => {
             if (item.invoice_number) {
-                stmt.run([item.invoice_number, item.arrival_date, item.clearing_warehouse, item.customer_name, item.status, item.destination, date]);
+                stmt.run([item.invoice_number, item.arrival_date || '', item.clearing_warehouse || '', item.customer_name || '', item.status || '', item.destination || '', date]);
             }
         });
 
         stmt.finalize();
 
         db.run('COMMIT', (err) => {
-            if (err) return res.status(500).json({ error: err.message });
+            if (err) return res.status(500).json({ success: false, message: err.message });
             res.json({ success: true, message: `${shipments.length} Cargo records successfully updated in bulk!` });
         });
     });
