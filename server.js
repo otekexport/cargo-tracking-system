@@ -41,7 +41,7 @@ app.get('/api/track/:invoice', (req, res) => {
         if (row) {
             res.json({ success: true, data: row });
         } else {
-            res.json({ success: false, message: 'Invoice Number eka hambawune na!' });
+            res.json({ success: false, message: 'Hari Invoice number eka dapanko!' });
         }
     });
 });
