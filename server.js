@@ -64,7 +64,7 @@ app.post('/api/admin/update', (req, res) => {
     });
 });
 
-// Admin Delete API
+// Admin Single Delete API
 app.post('/api/admin/delete', (req, res) => {
     const { admin_password, invoice_number } = req.body;
 
@@ -82,6 +82,27 @@ app.post('/api/admin/delete', (req, res) => {
             return res.json({ success: false, message: 'Invoice Number not found in database!' });
         }
         res.json({ success: true, message: `Invoice ${invoice_number} successfully deleted!` });
+    });
+});
+
+// Admin Multiple Delete API (New)
+app.post('/api/admin/delete-multiple', (req, res) => {
+    const { admin_password, invoice_numbers } = req.body;
+
+    if (admin_password !== ADMIN_PASSWORD) {
+        return res.json({ success: false, message: 'Invalid Admin Password!' });
+    }
+
+    if (!Array.isArray(invoice_numbers) || invoice_numbers.length === 0) {
+        return res.json({ success: false, message: 'Select at least one record to delete!' });
+    }
+
+    const placeholders = invoice_numbers.map(() => '?').join(',');
+    const query = `DELETE FROM shipments WHERE invoice_number IN (${placeholders})`;
+
+    db.run(query, invoice_numbers, function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true, message: `${this.changes} Record(s) successfully deleted!` });
     });
 });
 
