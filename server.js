@@ -3,13 +3,16 @@ const sqlite3 = require('sqlite3').verbose();
 const bodyParser = require('body-parser');
 const path = require('path');
 
+// Stripe SDK Initialization
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'sk_test_YOUR_SECRET_KEY_HERE');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Admin Password
+// Admin Password Configuration
 const ADMIN_PASSWORD = 'admin123';
 
-app.use(bodyParser.json({ limit: '10mb' }));
+app.use(bodyParser.json({ limit: '15mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // SQLite Database Setup
@@ -18,7 +21,7 @@ const db = new sqlite3.Database(path.join(__dirname, 'cargo.db'), (err) => {
     console.log('Database connected successfully.');
 });
 
-// Create Table & Safely Add New Columns if they don't exist
+// Create Table & Safely Add Columns
 db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS shipments (
         invoice_number TEXT PRIMARY KEY,
@@ -28,9 +31,10 @@ db.serialize(() => {
         updated_at TEXT
     )`);
 
-    // Add new columns if missing in existing database
     db.run(`ALTER TABLE shipments ADD COLUMN arrival_date TEXT`, (err) => {});
     db.run(`ALTER TABLE shipments ADD COLUMN clearing_warehouse TEXT`, (err) => {});
+    db.run(`ALTER TABLE shipments ADD COLUMN payment_status TEXT`, (err) => {});
+    db.run(`ALTER TABLE shipments ADD COLUMN payment_slip TEXT`, (err) => {});
 });
 
 // Customer Track API
@@ -41,9 +45,42 @@ app.get('/api/track/:invoice', (req, res) => {
         if (row) {
             res.json({ success: true, data: row });
         } else {
-            res.json({ success: false, message: 'Hari Invoice number eka dapanko!' });
+            res.json({ success: false, message: 'Invoice Number එක හමු වූයේ නැත!' });
         }
     });
+});
+
+// 💳 Stripe Online Card Payment Checkout Session API
+app.post('/api/create-checkout-session', async (req, res) => {
+    try {
+        const { invoice_number, amount, customer_name, currency } = req.body;
+
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ['card'],
+            line_items: [
+                {
+                    price_data: {
+                        currency: currency || 'jpy', // JPY, USD, or LKR
+                        product_data: {
+                            name: `Cargo Invoice: ${invoice_number}`,
+                            description: `Customer: ${customer_name}`,
+                        },
+                        unit_amount: Math.round(amount * (currency === 'jpy' ? 1 : 100)),
+                    },
+                    quantity: 1,
+                },
+            ],
+            mode: 'payment',
+            client_reference_id: invoice_number,
+            success_url: `https://${req.headers.host}/success.html?inv=${invoice_number}`,
+            cancel_url: `https://${req.headers.host}/cancel.html`,
+        });
+
+        res.json({ success: true, url: session.url });
+    } catch (error) {
+        console.error('Stripe Checkout Error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
 });
 
 // Admin Single Update API
