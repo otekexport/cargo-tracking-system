@@ -19,7 +19,6 @@
             overflow-x: hidden;
         }
 
-        /* Canvas Background for Falling Gold Stars & Floating Otek Logos */
         #starCanvas {
             position: fixed;
             top: 0;
@@ -50,7 +49,7 @@
         .tab-content { display: none; }
         .tab-content.active { display: block; }
         label { font-size: 14px; font-weight: bold; color: #333; display: block; margin-top: 12px; }
-        input[type="text"], input[type="password"], input[type="file"] { width: 100%; padding: 12px; margin: 6px 0 12px 0; font-size: 14px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; }
+        input[type="text"], input[type="password"], input[type="number"], input[type="file"] { width: 100%; padding: 12px; margin: 6px 0 12px 0; font-size: 14px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; }
         button.submit-btn { width: 100%; padding: 12px; font-size: 16px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; margin-top: 10px; font-weight: bold; }
         button.admin-btn { background: #007bff; }
         button.bulk-btn { background: #6f42c1; }
@@ -83,7 +82,6 @@
             margin: 0 auto 15px auto;
         }
 
-        /* 🟢 Horizontal Visual Progress Timeline Steps */
         .timeline-container {
             margin-top: 25px;
             padding: 22px 15px;
@@ -152,7 +150,6 @@
             font-size: 24px;
         }
 
-        /* Active / Completed Step Styling */
         .step-item.active .step-number {
             background: #28a745;
             color: white;
@@ -174,7 +171,6 @@
             100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
         }
 
-        /* Connecting Horizontal Line */
         .step-list::before {
             content: '';
             position: absolute;
@@ -186,7 +182,6 @@
             z-index: 0;
         }
 
-        /* Responsive Mobile Layout Adjustment */
         @media (max-width: 650px) {
             .step-list {
                 flex-direction: column;
@@ -213,7 +208,6 @@
             }
         }
 
-        /* Payment Container Grid */
         .payment-container {
             display: flex;
             flex-direction: column;
@@ -221,7 +215,6 @@
             margin-top: 20px;
         }
 
-        /* Bank Card Styling */
         .bank-card {
             padding: 20px;
             border-radius: 12px;
@@ -267,7 +260,6 @@
             line-height: 1.5;
         }
 
-        /* WhatsApp Section Styling */
         .whatsapp-card {
             margin-top: 20px;
             padding: 18px;
@@ -314,7 +306,6 @@
             margin-top: 10px;
         }
 
-        /* Footer Section Styling */
         .footer-section {
             margin-top: 35px;
             padding-top: 18px;
@@ -353,11 +344,9 @@
 </head>
 <body>
 
-    <!-- Falling Gold Stars & Floating Otek Logos Canvas Background -->
     <canvas id="starCanvas"></canvas>
 
     <div class="card">
-        <!-- Navigation Tabs -->
         <div class="nav-buttons">
             <button class="nav-btn active" id="btn-customer" onclick="switchTab('customer')">📦 Track Cargo</button>
             <button class="nav-btn" id="btn-admin" onclick="switchTab('admin')">🛠️ Admin Panel</button>
@@ -365,7 +354,6 @@
 
         <!-- Tab 1: Customer View -->
         <div id="customer" class="tab-content active">
-            <!-- Otek Export Logo -->
             <img src="logo.png" alt="Otek Export Logo" class="brand-logo" onerror="this.style.display='none'">
 
             <h3 style="margin-top:0; color:#28a745; text-align: center;">Otek Export Customer Tracking</h3>
@@ -379,7 +367,6 @@
         <div id="admin" class="tab-content">
             <h3 style="margin-top:0; color:#007bff; text-align: center;">Admin Panel</h3>
             
-            <!-- Login Form -->
             <div id="adminLoginForm">
                 <label>Admin Password:</label>
                 <input type="password" id="adminPassword" placeholder="Enter Password" onkeypress="if(event.key === 'Enter') verifyPassword()">
@@ -387,9 +374,7 @@
                 <div id="loginMsg"></div>
             </div>
 
-            <!-- Admin Forms -->
             <div id="adminUpdateForm" style="display: none;">
-                <!-- Full Table Page Button -->
                 <h4 style="margin: 0 0 5px 0; color: #17a2b8;">View & Manage Database</h4>
                 <button class="submit-btn view-page-btn" onclick="openRecordsPage()">📂 Open All Records in New Page</button>
 
@@ -405,6 +390,8 @@
                 <input type="text" id="inv" placeholder="INV-1001" onkeypress="if(event.key === 'Enter') updateShipment()">
                 <label>Customer Name:</label>
                 <input type="text" id="name" placeholder="Kamal Perera" onkeypress="if(event.key === 'Enter') updateShipment()">
+                <label>Invoice Amount (JPY):</label>
+                <input type="number" id="chargeAmount" placeholder="e.g. 15000" onkeypress="if(event.key === 'Enter') updateShipment()">
                 <label>Status:</label>
                 <input type="text" id="status" placeholder="In Transit / Delivered" onkeypress="if(event.key === 'Enter') updateShipment()">
                 <label>Destination:</label>
@@ -435,7 +422,6 @@
             </div>
         </div>
 
-        <!-- Footer Section with Copyright & Ownership -->
         <div class="footer-section">
             <div>© 2026 Otek Export & Panorama Cargo Logistics. All Rights Reserved.</div>
             <div class="developer-tag">System Developed & Maintained by <strong>tera_web service</strong></div>
@@ -447,7 +433,6 @@
         </div>
     </div>
 
-    <!-- Policy Modal Popup -->
     <div id="policyModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:1000; justify-content:center; align-items:center;">
         <div style="background:white; padding:25px; border-radius:12px; max-width:600px; width:90%; max-height:80vh; overflow-y:auto; box-shadow:0 10px 30px rgba(0,0,0,0.3);">
             <h3 id="modalTitle" style="margin-top:0; color:#0b253a;"></h3>
@@ -457,7 +442,6 @@
     </div>
 
     <script>
-        // 🌟 Falling Gold Stars & Otek Logos Canvas Background
         const canvas = document.getElementById('starCanvas');
         const ctx = canvas.getContext('2d');
         let stars = [];
@@ -530,7 +514,6 @@
         createStars();
         drawStars();
 
-        // System Variables & Logic
         let currentAdminPassword = "";
 
         const WHATSAPP_NUMBER_1 = "94740784400";
@@ -548,7 +531,7 @@
         }
 
         function getActiveStep(statusText, arrivalDateStr) {
-            let activeStep = 2; // Default: Shipped & In Transit
+            let activeStep = 2;
 
             if (arrivalDateStr && arrivalDateStr.trim() !== '' && arrivalDateStr.trim() !== '-') {
                 const parsedArrival = new Date(arrivalDateStr);
@@ -558,7 +541,7 @@
                     parsedArrival.setHours(0, 0, 0, 0);
 
                     if (today >= parsedArrival) {
-                        activeStep = 3; // Move to Step 3: Arrived at Port
+                        activeStep = 3;
                     }
                 }
             }
@@ -583,6 +566,7 @@
             const div = document.getElementById('result');
             if(data.success) {
                 const activeStep = getActiveStep(data.data.status, data.data.arrival_date);
+                const itemAmount = data.data.amount || 0;
 
                 const steps = [
                     { num: 1, title: "Cargo Received & Packed (Japan)", icon: "📦" },
@@ -624,25 +608,24 @@
                         <div class="result-item"><strong>Clearing Warehouse:</strong> ${data.data.clearing_warehouse || '-'}</div>
                         <div class="result-item"><strong>Invoice Number:</strong> ${data.data.invoice_number || '-'}</div>
                         <div class="result-item"><strong>Customer Name:</strong> ${data.data.customer_name || '-'}</div>
+                        <div class="result-item"><strong>Invoice Amount:</strong> ¥${itemAmount.toLocaleString()} JPY</div>
                         <div class="result-item"><strong>Status:</strong> ${data.data.status || '-'}</div>
                         <div class="result-item"><strong>Destination:</strong> ${data.data.destination || '-'}</div>
                     </div>
 
                     ${timelineHtml}
 
-                    <!-- 💳 Online Stripe Card Payment Box -->
+                    <!-- 💳 Dynamic Online Stripe Card Payment Box -->
                     <div style="margin-top:20px; padding:18px; background:#f5f3ff; border:1px solid #ddd6fe; border-radius:12px; text-align:center;">
                         <h4 style="margin:0 0 8px 0; color:#5b21b6;">💳 Online Card Payment (Stripe)</h4>
                         <p style="margin:0 0 12px 0; font-size:13px; color:#4c1d95;">Pay freight charges securely using Credit/Debit Card (Visa, Mastercard, AMEX, Apple Pay).</p>
-                        <button class="stripe-pay-btn" onclick="payWithStripe('${data.data.invoice_number}', '${data.data.customer_name}', 10000, 'jpy')">
-                            💳 Pay Invoice via Card
+                        <button class="stripe-pay-btn" onclick="payWithStripe('${data.data.invoice_number}', '${data.data.customer_name}', ${itemAmount}, 'jpy')">
+                            💳 Pay Invoice via Card (¥${itemAmount.toLocaleString()})
                         </button>
                     </div>
 
-                    <!-- Payment Information Container -->
                     <div class="payment-container">
                         
-                        <!-- 🇱🇰 Sri Lanka Bank Details -->
                         <div class="bank-card sl-bank-card">
                             <div class="bank-title" style="color: #004085;">
                                 🇱🇰 SRI LANKA PAYMENT INFORMATION - PANORAMA CARGO LOGISTICS (PVT) LTD
@@ -655,11 +638,10 @@
                             </div>
                             <div class="bank-note">
                                 📌 <b>Note:</b> Please make all your cash deposits / online fund transfers to the above bank account & submit the deposit slip with your Invoice at our counter.<br>
-                                ⚠️ <b>Important:</b> Please mention your Invoice No. & BL No. in the 'Purpose' column. (This will help us track your payment quickly.)
+                                ⚠️ <b>Important:</b> Please mention your Invoice No. & BL No. in the 'Purpose' column.
                             </div>
                         </div>
 
-                        <!-- 🇯🇵 Japan Bank Details -->
                         <div class="bank-card jp-bank-card">
                             <div class="bank-title" style="color: #856404;">
                                 🇯🇵 JAPAN BANK ACCOUNT DETAILS FOR REMITTANCE (ප්‍රේෂණය සඳහා බැංකු ගිණුම් විස්තර)
@@ -673,7 +655,6 @@
                                 <b>Institution Code:</b> 9900<br><br>
 
                                 <b>REMITTANCE BRANCH & ACCOUNT INFO (ප්‍රේෂණ ශාඛාව සහ ගිණුම් විස්තර):</b><br>
-                                <i>- For use when sending from other financial institutions (වෙනත් මුල්‍ය ආයතන වලින් එවන විට භාවිතයට)</i><br>
                                 <b>Branch Name:</b> ZERO YON HACHI (ゼロヨンハチ)<br>
                                 <b>Branch Code:</b> 048<br>
                                 <b>Deposit Type:</b> ORDINARY DEPOSIT (普通預金)<br>
@@ -683,15 +664,10 @@
                                 <b>Japan Post Account:</b> 10490 - 32506831<br>
                                 <b>Name:</b> オテックモーターエクスポート (カ
                             </div>
-                            <div class="bank-note">
-                                💡 Please use the 'Remittance Branch & Account Info' above for inter-bank transfers. Thank you.<br>
-                                (අන්තර් බැංකු හුවමාරු සඳහා කරුණාකර ඉහත 'ප්‍රේෂණ ශාඛාව සහ ගිණුම් විස්තර' භාවිතා කරන්න. ස්තුතියි.)
-                            </div>
                         </div>
 
                     </div>
 
-                    <!-- WhatsApp 3 Lines Contact Box -->
                     <div class="whatsapp-card">
                         <h4 style="margin:0 0 8px 0; color:#1b5e20;">💬 Contact Sri Lanka Office (WhatsApp)</h4>
                         
@@ -706,12 +682,6 @@
                                 📞 Line 3: +94 74 010 4400
                             </a>
                         </div>
-
-                        <div class="time-notice">
-                            📌 <b>සිංහල:</b> කරුණාකර සතියේ වැඩකරන දිනයන්හි පෙ.ව. 8:30 සිට ප.ව. 5:00 දක්වා වේලාවන් තුළ අමතන්න.<br>
-                            📌 <b>English:</b> Please call on working days from 8:30 AM to 5:00 PM.<br>
-                            📌 <b>தமிழ்:</b> தயவுசெய்து வேலை நாட்களில் காலை 8:30 மணி முதல் மாலை 5:00 மணி வரை தொடர்புகொள்ளவும்.
-                        </div>
                     </div>
                 `;
             } else {
@@ -719,9 +689,10 @@
             }
         }
 
-        // Stripe Payment Function
         async function payWithStripe(invoiceNumber, customerName, amount, currency = 'jpy') {
-            if (!amount || amount <= 0) return alert('Invalid Payment Amount');
+            if (!amount || amount <= 0) {
+                return alert('මේ Invoice එක සඳහා ගෙවීමට අදාළ මුදල (Amount) තවමත් Admin විසින් ඇතුළත් කර නොමැත.');
+            }
 
             try {
                 const res = await fetch('/api/create-checkout-session', {
@@ -746,7 +717,6 @@
             }
         }
 
-        // Policy Modal Logic
         function showPolicy(type) {
             const modal = document.getElementById('policyModal');
             const title = document.getElementById('modalTitle');
@@ -754,18 +724,10 @@
 
             if (type === 'terms') {
                 title.innerText = 'Terms of Service';
-                body.innerHTML = `
-                    <p><b>1. Cargo Tracking Service:</b> The information provided on this system is based on live shipping manifests. Delivery times and clearing dates are subject to port and customs procedures in Sri Lanka.</p>
-                    <p><b>2. Payments:</b> All freight and clearing charges must be deposited only to our official bank accounts listed on this page (Panorama Cargo Logistics in Sri Lanka or Otek Motor Export Co., Ltd in Japan) or via our secured online Stripe payment gateway.</p>
-                    <p><b>3. Purpose Reference:</b> Customers must mention their Invoice Number and BL Number in transaction remarks for quick verification.</p>
-                `;
+                body.innerHTML = `<p>Cargo tracking details are updated live. All freight payments can be made online via Stripe or directly to our bank accounts.</p>`;
             } else if (type === 'privacy') {
                 title.innerText = 'Privacy Policy';
-                body.innerHTML = `
-                    <p><b>1. Data Security:</b> Customer details including Invoice Number, Name, and Cargo Status are stored securely and used solely for tracking and logistics coordination.</p>
-                    <p><b>2. Data Protection:</b> Personal information is never shared with unauthorized third parties.</p>
-                    <p><b>3. Maintenance:</b> System infrastructure and security are monitored and maintained by tera_web service.</p>
-                `;
+                body.innerHTML = `<p>Your personal data and shipping tracking details are kept confidential and secure.</p>`;
             }
             modal.style.display = 'flex';
         }
@@ -804,6 +766,7 @@
                 clearing_warehouse: document.getElementById('clearingWarehouse').value,
                 invoice_number: document.getElementById('inv').value,
                 customer_name: document.getElementById('name').value,
+                amount: document.getElementById('chargeAmount').value,
                 status: document.getElementById('status').value,
                 destination: document.getElementById('dest').value
             };
@@ -875,29 +838,15 @@
                         const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/^"\vert{}"$/g, ''));
 
                         if (cols.length >= 4) {
-                            if (cols.length >= 6 || isNaN(Number(cols[0]))) {
-                                if (cols[2]) {
-                                    shipments.push({
-                                        arrival_date: cols[0] || '',
-                                        clearing_warehouse: cols[1] || '',
-                                        invoice_number: cols[2] || '',
-                                        customer_name: cols[3] || '',
-                                        status: cols[4] || '',
-                                        destination: cols[5] || ''
-                                    });
-                                }
-                            } else {
-                                if (cols[0]) {
-                                    shipments.push({
-                                        arrival_date: '',
-                                        clearing_warehouse: '',
-                                        invoice_number: cols[0] || '',
-                                        customer_name: cols[1] || '',
-                                        status: cols[2] || '',
-                                        destination: cols[3] || ''
-                                    });
-                                }
-                            }
+                            shipments.push({
+                                arrival_date: cols[0] || '',
+                                clearing_warehouse: cols[1] || '',
+                                invoice_number: cols[2] || '',
+                                customer_name: cols[3] || '',
+                                status: cols[4] || '',
+                                destination: cols[5] || '',
+                                amount: cols[6] || 0
+                            });
                         }
                     }
 
