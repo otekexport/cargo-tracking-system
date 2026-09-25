@@ -35,6 +35,7 @@ db.serialize(() => {
     db.run(`ALTER TABLE shipments ADD COLUMN clearing_warehouse TEXT`, (err) => {});
     db.run(`ALTER TABLE shipments ADD COLUMN payment_status TEXT`, (err) => {});
     db.run(`ALTER TABLE shipments ADD COLUMN payment_slip TEXT`, (err) => {});
+    db.run(`ALTER TABLE shipments ADD COLUMN amount REAL`, (err) => {});
 });
 
 // Customer Track API
@@ -55,6 +56,11 @@ app.post('/api/create-checkout-session', async (req, res) => {
     try {
         const { invoice_number, amount, customer_name, currency } = req.body;
 
+        const payAmount = Number(amount) || 0;
+        if (payAmount <= 0) {
+            return res.status(400).json({ success: false, message: 'අදාළ Invoice එක සඳහා ගෙවිය යුතු මුදලක් (Amount) සඳහන් කර නැත.' });
+        }
+
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
             line_items: [
@@ -65,7 +71,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
                             name: `Cargo Invoice: ${invoice_number}`,
                             description: `Customer: ${customer_name}`,
                         },
-                        unit_amount: Math.round(amount * (currency === 'jpy' ? 1 : 100)),
+                        unit_amount: Math.round(payAmount * (currency === 'jpy' ? 1 : 100)),
                     },
                     quantity: 1,
                 },
@@ -85,7 +91,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
 
 // Admin Single Update API
 app.post('/api/admin/update', (req, res) => {
-    const { admin_password, arrival_date, clearing_warehouse, invoice_number, customer_name, status, destination } = req.body;
+    const { admin_password, arrival_date, clearing_warehouse, invoice_number, customer_name, status, destination, amount } = req.body;
 
     if (admin_password !== ADMIN_PASSWORD) {
         return res.json({ success: false, message: 'Invalid Admin Password!' });
@@ -93,17 +99,18 @@ app.post('/api/admin/update', (req, res) => {
 
     const date = new Date().toLocaleString();
 
-    const query = `INSERT INTO shipments (invoice_number, arrival_date, clearing_warehouse, customer_name, status, destination, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)
+    const query = `INSERT INTO shipments (invoice_number, arrival_date, clearing_warehouse, customer_name, status, destination, amount, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT(invoice_number) DO UPDATE SET
                    arrival_date = excluded.arrival_date,
                    clearing_warehouse = excluded.clearing_warehouse,
                    customer_name = excluded.customer_name,
                    status = excluded.status,
                    destination = excluded.destination,
+                   amount = excluded.amount,
                    updated_at = excluded.updated_at`;
 
-    db.run(query, [invoice_number, arrival_date, clearing_warehouse, customer_name, status, destination, date], function(err) {
+    db.run(query, [invoice_number, arrival_date, clearing_warehouse, customer_name, status, destination, amount || 0, date], function(err) {
         if (err) return res.status(500).json({ error: err.message });
         res.json({ success: true, message: 'Shipment updated successfully!' });
     });
@@ -178,14 +185,15 @@ app.post('/api/admin/bulk-update', (req, res) => {
     }
 
     const date = new Date().toLocaleString();
-    const query = `INSERT INTO shipments (invoice_number, arrival_date, clearing_warehouse, customer_name, status, destination, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)
+    const query = `INSERT INTO shipments (invoice_number, arrival_date, clearing_warehouse, customer_name, status, destination, amount, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT(invoice_number) DO UPDATE SET
                    arrival_date = excluded.arrival_date,
                    clearing_warehouse = excluded.clearing_warehouse,
                    customer_name = excluded.customer_name,
                    status = excluded.status,
                    destination = excluded.destination,
+                   amount = excluded.amount,
                    updated_at = excluded.updated_at`;
 
     db.serialize(() => {
@@ -196,7 +204,16 @@ app.post('/api/admin/bulk-update', (req, res) => {
 
         shipments.forEach(item => {
             if (item.invoice_number) {
-                stmt.run([item.invoice_number, item.arrival_date || '', item.clearing_warehouse || '', item.customer_name || '', item.status || '', item.destination || '', date]);
+                stmt.run([
+                    item.invoice_number,
+                    item.arrival_date || '',
+                    item.clearing_warehouse || '',
+                    item.customer_name || '',
+                    item.status || '',
+                    item.destination || '',
+                    item.amount || 0,
+                    date
+                ]);
             }
         });
 
