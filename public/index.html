@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Otek Export Cargo System</title>
+    <!-- Stripe JS SDK -->
+    <script src="https://js.stripe.com/v3/"></script>
     <style>
         body { 
             font-family: Arial, sans-serif; 
@@ -17,7 +19,7 @@
             overflow-x: hidden;
         }
 
-        /* Canvas Background for Falling Gold Stars & Logos */
+        /* Canvas Background for Falling Gold Stars & Floating Otek Logos */
         #starCanvas {
             position: fixed;
             top: 0;
@@ -54,6 +56,8 @@
         button.bulk-btn { background: #6f42c1; }
         button.delete-btn { background: #dc3545; }
         button.view-page-btn { background: #17a2b8; }
+        button.stripe-pay-btn { background: #635bff; color: white; border: none; padding: 12px 24px; border-radius: 25px; font-weight: bold; cursor: pointer; font-size: 15px; box-shadow: 0 4px 12px rgba(99, 91, 255, 0.35); transition: transform 0.2s, background 0.2s; }
+        button.stripe-pay-btn:hover { background: #4b45e4; transform: translateY(-2px); }
         .section-divider { border-top: 1px solid #ddd; margin: 25px 0; }
         
         #result { margin-top: 18px; font-size: 15px; line-height: 1.6; word-break: break-word; }
@@ -349,7 +353,7 @@
 </head>
 <body>
 
-    <!-- Falling Gold Stars & Logos Canvas Background -->
+    <!-- Falling Gold Stars & Floating Otek Logos Canvas Background -->
     <canvas id="starCanvas"></canvas>
 
     <div class="card">
@@ -458,7 +462,6 @@
         const ctx = canvas.getContext('2d');
         let stars = [];
 
-        // Load Otek Logo Image for background animation
         const logoImg = new Image();
         logoImg.src = 'logo.png';
 
@@ -473,12 +476,12 @@
             stars = [];
             const count = Math.floor(window.innerWidth / 10);
             for (let i = 0; i < count; i++) {
-                const isLogo = (i % 6 === 0); // 1 out of every 6 floating particles is a small Otek Logo
+                const isLogo = (i % 6 === 0);
                 stars.push({
                     isLogo: isLogo,
                     x: Math.random() * canvas.width,
                     y: Math.random() * canvas.height,
-                    size: isLogo ? (Math.random() * 12 + 20) : (Math.random() * 2.5 + 1), // Logo size: 20px-32px, Star size: 1px-3.5px
+                    size: isLogo ? (Math.random() * 12 + 20) : (Math.random() * 2.5 + 1),
                     speedY: Math.random() * 1.2 + 0.3,
                     speedX: (Math.random() - 0.5) * 0.4,
                     opacity: Math.random() * 0.7 + 0.3,
@@ -495,11 +498,9 @@
                 ctx.globalAlpha = s.opacity;
 
                 if (s.isLogo && logoImg.complete && logoImg.naturalWidth !== 0) {
-                    // Draw floating small Otek logo maintaining aspect ratio
                     const aspect = logoImg.naturalHeight / logoImg.naturalWidth;
                     ctx.drawImage(logoImg, s.x, s.y, s.size, s.size * aspect);
                 } else {
-                    // Draw glowing gold star
                     ctx.beginPath();
                     ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
                     ctx.fillStyle = s.color;
@@ -546,9 +547,8 @@
             document.getElementById('btn-' + tabName).classList.add('active');
         }
 
-        // Logic to calculate active step (Default Step 2, Step 3 on/after Arrival Date)
         function getActiveStep(statusText, arrivalDateStr) {
-            let activeStep = 2; // Default Position: Shipped & In Transit (Vessel)
+            let activeStep = 2; // Default: Shipped & In Transit
 
             if (arrivalDateStr && arrivalDateStr.trim() !== '' && arrivalDateStr.trim() !== '-') {
                 const parsedArrival = new Date(arrivalDateStr);
@@ -558,7 +558,7 @@
                     parsedArrival.setHours(0, 0, 0, 0);
 
                     if (today >= parsedArrival) {
-                        activeStep = 3; // Move to Final Step: Arrived at Port
+                        activeStep = 3; // Move to Step 3: Arrived at Port
                     }
                 }
             }
@@ -629,6 +629,15 @@
                     </div>
 
                     ${timelineHtml}
+
+                    <!-- 💳 Online Stripe Card Payment Box -->
+                    <div style="margin-top:20px; padding:18px; background:#f5f3ff; border:1px solid #ddd6fe; border-radius:12px; text-align:center;">
+                        <h4 style="margin:0 0 8px 0; color:#5b21b6;">💳 Online Card Payment (Stripe)</h4>
+                        <p style="margin:0 0 12px 0; font-size:13px; color:#4c1d95;">Pay freight charges securely using Credit/Debit Card (Visa, Mastercard, AMEX, Apple Pay).</p>
+                        <button class="stripe-pay-btn" onclick="payWithStripe('${data.data.invoice_number}', '${data.data.customer_name}', 10000, 'jpy')">
+                            💳 Pay Invoice via Card
+                        </button>
+                    </div>
 
                     <!-- Payment Information Container -->
                     <div class="payment-container">
@@ -710,6 +719,33 @@
             }
         }
 
+        // Stripe Payment Function
+        async function payWithStripe(invoiceNumber, customerName, amount, currency = 'jpy') {
+            if (!amount || amount <= 0) return alert('Invalid Payment Amount');
+
+            try {
+                const res = await fetch('/api/create-checkout-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        invoice_number: invoiceNumber,
+                        customer_name: customerName,
+                        amount: amount,
+                        currency: currency
+                    })
+                });
+
+                const data = await res.json();
+                if (data.success && data.url) {
+                    window.location.href = data.url;
+                } else {
+                    alert('Payment initialization failed: ' + data.message);
+                }
+            } catch (err) {
+                alert('Connection error: ' + err.message);
+            }
+        }
+
         // Policy Modal Logic
         function showPolicy(type) {
             const modal = document.getElementById('policyModal');
@@ -720,8 +756,8 @@
                 title.innerText = 'Terms of Service';
                 body.innerHTML = `
                     <p><b>1. Cargo Tracking Service:</b> The information provided on this system is based on live shipping manifests. Delivery times and clearing dates are subject to port and customs procedures in Sri Lanka.</p>
-                    <p><b>2. Payments:</b> All freight and clearing charges must be deposited only to our official bank accounts listed on this page (Panorama Cargo Logistics in Sri Lanka or Otek Motor Export Co., Ltd in Japan).</p>
-                    <p><b>3. Purpose Reference:</b> Customers must mention their Invoice Number and BL Number in the transaction remarks for quick verification.</p>
+                    <p><b>2. Payments:</b> All freight and clearing charges must be deposited only to our official bank accounts listed on this page (Panorama Cargo Logistics in Sri Lanka or Otek Motor Export Co., Ltd in Japan) or via our secured online Stripe payment gateway.</p>
+                    <p><b>3. Purpose Reference:</b> Customers must mention their Invoice Number and BL Number in transaction remarks for quick verification.</p>
                 `;
             } else if (type === 'privacy') {
                 title.innerText = 'Privacy Policy';
