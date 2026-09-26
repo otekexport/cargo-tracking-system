@@ -690,32 +690,38 @@
         }
 
         async function payWithStripe(invoiceNumber, customerName, amount, currency = 'jpy') {
-            if (!amount || amount <= 0) {
-                return alert('මේ Invoice එක සඳහා ගෙවීමට අදාළ මුදල (Amount) තවමත් Admin විසින් ඇතුළත් කර නොමැත.');
-            }
+    if (!amount || amount <= 0) {
+        return alert('මේ Invoice එක සඳහා ගෙවීමට අදාළ මුදල (Amount) තවමත් Admin විසින් ඇතුළත් කර නොමැත.');
+    }
 
-            try {
-                const res = await fetch('/api/create-checkout-session', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        invoice_number: invoiceNumber,
-                        customer_name: customerName,
-                        amount: amount,
-                        currency: currency
-                    })
-                });
+    // Browser එකෙන් Popup Block වීම වැළැක්වීමට මුලින්ම Blank Tab එකක් Open කරගනී
+    const paymentTab = window.open('about:blank', '_blank');
 
-                const data = await res.json();
-                if (data.success && data.url) {
-                    window.location.href = data.url;
-                } else {
-                    alert('Payment initialization failed: ' + data.message);
-                }
-            } catch (err) {
-                alert('Connection error: ' + err.message);
-            }
+    try {
+        const res = await fetch('/api/create-checkout-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                invoice_number: invoiceNumber,
+                customer_name: customerName,
+                amount: amount,
+                currency: currency
+            })
+        });
+
+        const data = await res.json();
+        if (data.success && data.url) {
+            // අලුත් Tab එක Stripe Payment පිටුවට Redirect කරයි
+            paymentTab.location.href = data.url;
+        } else {
+            paymentTab.close();
+            alert('Payment initialization failed: ' + data.message);
         }
+    } catch (err) {
+        paymentTab.close();
+        alert('Connection error: ' + err.message);
+    }
+}
 
         function showPolicy(type) {
             const modal = document.getElementById('policyModal');
