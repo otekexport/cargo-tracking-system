@@ -72,7 +72,7 @@
         .tab-content.active { display: block; }
         
         label { font-size: 14px; font-weight: bold; color: #333; display: block; margin-top: 12px; }
-        input[type="text"], input[type="password"], input[type="number"], input[type="file"] { width: 100%; padding: 12px; margin: 6px 0 12px 0; font-size: 14px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; }
+        input[type="text"], input[type="password"], input[type="number"], input[type="email"], input[type="file"] { width: 100%; padding: 12px; margin: 6px 0 12px 0; font-size: 14px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; }
         
         button.submit-btn { width: 100%; padding: 12px; font-size: 16px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; margin-top: 10px; font-weight: bold; }
         button.admin-btn { background: #007bff; }
@@ -239,11 +239,30 @@
             }
         }
 
+        .toggle-bank-btn {
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            color: #1e293b;
+            padding: 10px 18px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .toggle-bank-btn:hover {
+            background: #e2e8f0;
+            color: #0f172a;
+        }
+
         .payment-container {
             display: flex;
             flex-direction: column;
             gap: 18px;
-            margin-top: 20px;
+            margin-top: 15px;
         }
 
         .bank-card {
@@ -367,7 +386,7 @@
     <canvas id="starCanvas"></canvas>
 
     <div class="card">
-        <!-- 🔝 Main Top Navigation Buttons -->
+        <!-- Main Top Navigation Buttons -->
         <div class="nav-buttons">
             <button class="nav-btn active" id="btn-customer" onclick="switchTab('customer')">📦 Track Cargo</button>
             <button class="nav-btn" id="btn-payment" onclick="switchTab('payment')">💳 Direct Payment</button>
@@ -386,7 +405,7 @@
             <div id="result"></div>
         </div>
 
-        <!-- Tab 2: Direct Payment View (අලුතින් එකතු කළ කොටස) -->
+        <!-- Tab 2: Direct Payment View -->
         <div id="payment" class="tab-content">
             <img src="logo.png" alt="Otek Export Logo" class="brand-logo" onerror="this.style.display='none'">
             
@@ -396,6 +415,9 @@
             <div style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 20px; border-radius: 12px;">
                 <label>Customer Name (ඔබගේ නම):</label>
                 <input type="text" id="customName" placeholder="e.g. Kamal Perera">
+
+                <label>Email Address (ගෙවීම් රිසිට්පත ලැබිය යුතු Email එක):</label>
+                <input type="email" id="customEmail" placeholder="e.g. kamal@gmail.com">
 
                 <label>Invoice Number (ඉන්වොයිස් අංකය):</label>
                 <input type="text" id="customInv" placeholder="e.g. INV-1001">
@@ -566,7 +588,6 @@
         const WHATSAPP_NUMBER_2 = "94740304400";
         const WHATSAPP_NUMBER_3 = "94740104400";
 
-        // Tabs 3ක් මාරු කිරීමට Update කළ Function එක
         function switchTab(tabName) {
             document.getElementById('customer').classList.remove('active');
             document.getElementById('payment').classList.remove('active');
@@ -665,7 +686,7 @@
 
                     ${timelineHtml}
 
-                    <!-- 💳 Online Stripe Card Payment Redirect Box -->
+                    <!-- 💳 Card Payment Option Box -->
                     <div style="margin-top:20px; padding:18px; background:#f5f3ff; border:1px solid #ddd6fe; border-radius:12px; text-align:center;">
                         <h4 style="margin:0 0 8px 0; color:#5b21b6;">💳 Online Card Payment (Stripe)</h4>
                         <p style="margin:0 0 12px 0; font-size:13px; color:#4c1d95;">Pay freight charges securely using Credit/Debit Card (Visa, Mastercard, AMEX, Apple Pay).</p>
@@ -674,7 +695,15 @@
                         </button>
                     </div>
 
-                    <div class="payment-container">
+                    <!-- 🏦 Bank Transfer Toggle Button (අවශ්‍ය නම් පමණක් බලාගැනීමට සාදා ඇති බටන් එක) -->
+                    <div style="text-align: center; margin-top: 18px;">
+                        <button type="button" class="toggle-bank-btn" onclick="toggleBankDetails()">
+                            🏛️ View Bank Account Details (බැංකු විස්තර බලන්න)
+                        </button>
+                    </div>
+
+                    <!-- 🏦 Bank Details Container (Hidden by Default) -->
+                    <div class="payment-container" id="bankDetailsSection" style="display: none;">
                         
                         <div class="bank-card sl-bank-card">
                             <div class="bank-title" style="color: #004085;">
@@ -739,7 +768,18 @@
             }
         }
 
-        // Tracking පරීක්ෂා කිරීමෙන් පසු යොමු වන Function එක
+        // බැංකු විස්තර පෙන්වීම සහ සඟවා ගැනීම සිදුකරන Function එක
+        function toggleBankDetails() {
+            const sec = document.getElementById('bankDetailsSection');
+            if (sec) {
+                if (sec.style.display === 'none') {
+                    sec.style.display = 'flex';
+                } else {
+                    sec.style.display = 'none';
+                }
+            }
+        }
+
         function goToPaymentPage(invoiceNumber, customerName, amount) {
             if (!amount || amount <= 0) {
                 return alert('මේ Invoice එක සඳහා ගෙවීමට අදාළ මුදල (Amount) තවමත් Admin විසින් ඇතුළත් කර නොමැත.');
@@ -747,17 +787,18 @@
             window.location.href = `/payment.html?tracking=${encodeURIComponent(invoiceNumber)}&amount=${amount}&name=${encodeURIComponent(customerName)}`;
         }
 
-        // Direct Payment Tab එකෙන් කෙළින්ම ගෙවීමට යොමු වන Function එක
         function makeDirectPayment() {
             const name = document.getElementById('customName').value.trim();
+            const email = document.getElementById('customEmail').value.trim();
             const inv = document.getElementById('customInv').value.trim();
             const amount = parseFloat(document.getElementById('customAmount').value);
 
             if (!name) return alert('කරුණාකර ඔබගේ නම (Customer Name) ඇතුළත් කරන්න.');
+            if (!email || !email.includes('@')) return alert('කරුණාකර නිවැරදි Email ලිපිනයක් ඇතුළත් කරන්න.');
             if (!inv) return alert('කරුණාකර Invoice Number එක ඇතුළත් කරන්න.');
             if (!amount || amount <= 0) return alert('කරුණාකර ගෙවීමට අදාළ මුදල (Amount JPY) නිවැරදිව ඇතුළත් කරන්න.');
 
-            window.location.href = `/payment.html?tracking=${encodeURIComponent(inv)}&amount=${amount}&name=${encodeURIComponent(name)}`;
+            window.location.href = `/payment.html?tracking=${encodeURIComponent(inv)}&amount=${amount}&name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}`;
         }
 
         function showPolicy(type) {
