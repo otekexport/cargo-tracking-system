@@ -383,6 +383,7 @@
 </head>
 <body>
 
+    <!-- Background Canvas for Gold Stars & "Otek" Floating Animation -->
     <canvas id="starCanvas"></canvas>
 
     <div class="card">
@@ -510,12 +511,10 @@
     </div>
 
     <script>
+        // 🌟 Gold Stars & Gold "Otek" Text Falling Animation Script
         const canvas = document.getElementById('starCanvas');
         const ctx = canvas.getContext('2d');
         let stars = [];
-
-        const logoImg = new Image();
-        logoImg.src = 'logo.png';
 
         function resizeCanvas() {
             canvas.width = window.innerWidth;
@@ -526,18 +525,18 @@
 
         function createStars() {
             stars = [];
-            const count = Math.floor(window.innerWidth / 10);
+            const count = Math.floor(window.innerWidth / 12);
             for (let i = 0; i < count; i++) {
-                const isLogo = (i % 6 === 0);
+                const isText = (i % 5 === 0); // 20% Text ("Otek"), 80% Gold Stars
                 stars.push({
-                    isLogo: isLogo,
+                    isText: isText,
                     x: Math.random() * canvas.width,
                     y: Math.random() * canvas.height,
-                    size: isLogo ? (Math.random() * 12 + 20) : (Math.random() * 2.5 + 1),
-                    speedY: Math.random() * 1.2 + 0.3,
-                    speedX: (Math.random() - 0.5) * 0.4,
+                    size: isText ? 13 : (Math.random() * 2.5 + 1),
+                    speedY: Math.random() * 0.8 + 0.3,
+                    speedX: (Math.random() - 0.5) * 0.3,
                     opacity: Math.random() * 0.7 + 0.3,
-                    fadeSpeed: Math.random() * 0.02 + 0.005,
+                    fadeSpeed: Math.random() * 0.015 + 0.005,
                     color: Math.random() > 0.3 ? '#FFD700' : '#FFF8DC'
                 });
             }
@@ -549,14 +548,17 @@
                 ctx.save();
                 ctx.globalAlpha = s.opacity;
 
-                if (s.isLogo && logoImg.complete && logoImg.naturalWidth !== 0) {
-                    const aspect = logoImg.naturalHeight / logoImg.naturalWidth;
-                    ctx.drawImage(logoImg, s.x, s.y, s.size, s.size * aspect);
+                if (s.isText) {
+                    ctx.font = 'bold 13px Segoe UI, Arial, sans-serif';
+                    ctx.fillStyle = '#FFD700';
+                    ctx.shadowBlur = 8;
+                    ctx.shadowColor = '#FFD700';
+                    ctx.fillText('Otek', s.x, s.y);
                 } else {
                     ctx.beginPath();
                     ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
                     ctx.fillStyle = s.color;
-                    ctx.shadowBlur = 10;
+                    ctx.shadowBlur = 8;
                     ctx.shadowColor = '#FFD700';
                     ctx.fill();
                 }
@@ -572,7 +574,7 @@
                 }
 
                 if (s.y > canvas.height) {
-                    s.y = -30;
+                    s.y = -20;
                     s.x = Math.random() * canvas.width;
                 }
             });
@@ -695,7 +697,7 @@
                         </button>
                     </div>
 
-                    <!-- 🏦 Bank Transfer Toggle Button (අවශ්‍ය නම් පමණක් බලාගැනීමට සාදා ඇති බටන් එක) -->
+                    <!-- 🏦 Bank Transfer Toggle Button -->
                     <div style="text-align: center; margin-top: 18px;">
                         <button type="button" class="toggle-bank-btn" onclick="toggleBankDetails()">
                             🏛️ View Bank Account Details (බැංකු විස්තර බලන්න)
@@ -768,7 +770,6 @@
             }
         }
 
-        // බැංකු විස්තර පෙන්වීම සහ සඟවා ගැනීම සිදුකරන Function එක
         function toggleBankDetails() {
             const sec = document.getElementById('bankDetailsSection');
             if (sec) {
