@@ -3,52 +3,191 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secure Payment - Otek Cargo</title>
+    <title>Secure Payment - Otek Export Cargo</title>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; background: #f4f7f6; }
-        .payment-card { background: white; padding: 25px; border-radius: 8px; max-width: 450px; margin: 40px auto; box-shadow: 0 4px 12px rgba(0,0,0,0.15); text-align: center; }
-        .pay-btn { background-color: #00d4b6; color: #000; padding: 14px; border: none; border-radius: 6px; font-size: 18px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 20px; }
-        .pay-btn:hover { background-color: #00b89e; }
-        .details { background: #eef2f5; padding: 15px; border-radius: 6px; margin-bottom: 20px; text-align: left; }
+        * {
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+        body {
+            background: linear-gradient(135deg, #05131f, #0b253a, #113856);
+            margin: 0;
+            padding: 20px;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .payment-card {
+            background: rgba(255, 255, 255, 0.96);
+            padding: 35px;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            max-width: 480px;
+            width: 100%;
+            text-align: center;
+        }
+        .payment-card h2 {
+            margin-top: 0;
+            color: #0b253a;
+            font-size: 22px;
+        }
+        .subtitle {
+            color: #64748b;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+        .details-box {
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            text-align: left;
+        }
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            font-size: 15px;
+        }
+        .detail-row:last-child {
+            margin-bottom: 0;
+            padding-top: 12px;
+            border-top: 1px dashed #cbd5e1;
+            font-weight: bold;
+        }
+        .detail-label {
+            color: #64748b;
+        }
+        .detail-value {
+            color: #0f172a;
+            font-weight: 600;
+        }
+        .amount-highlight {
+            color: #16a34a;
+            font-size: 20px;
+            font-weight: 800;
+        }
+        .pay-btn {
+            background-color: #635bff;
+            color: white;
+            padding: 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 17px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            transition: background 0.2s;
+        }
+        .pay-btn:hover {
+            background-color: #4b45e4;
+        }
+        .status-msg {
+            margin-bottom: 20px;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: bold;
+            display: none;
+        }
+        .status-success {
+            background-color: #dcfce7;
+            color: #15803d;
+            border: 1px solid #bbf7d0;
+        }
+        .status-cancel {
+            background-color: #fef2f2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+        }
+        .back-link {
+            display: inline-block;
+            margin-top: 20px;
+            color: #007bff;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
 
 <div class="payment-card">
     <h2>💳 Complete Your Payment</h2>
-    
-    <div class="details">
-        <p><strong>Tracking Number:</strong> <span id="displayTracking">Loading...</span></p>
-        <p><strong>Total Amount:</strong> <span id="displayAmount">Loading...</span></p>
+    <p class="subtitle">Secure Online Payment Gateway</p>
+
+    <div id="statusAlert" class="status-msg"></div>
+
+    <div class="details-box">
+        <div class="detail-row">
+            <span class="detail-label">Customer Name:</span>
+            <span class="detail-value" id="displayName">Loading...</span>
+        </div>
+        <div class="detail-row">
+            <span class="detail-label">Invoice / Tracking:</span>
+            <span class="detail-value" id="displayTracking">Loading...</span>
+        </div>
+        <div class="detail-row">
+            <span class="detail-label">Total Payable:</span>
+            <span class="amount-highlight" id="displayAmount">Loading...</span>
+        </div>
     </div>
 
     <button class="pay-btn" id="checkoutBtn">Proceed to Stripe Payment</button>
+
+    <br>
+    <a href="/" class="back-link">← Back to Tracking System</a>
 </div>
 
 <script>
-    // URL Parameters කියවා ගැනීම
     const urlParams = new URLSearchParams(window.location.search);
-    const trackingNumber = urlParams.get('tracking') || 'N/A';
+    const tracking = urlParams.get('tracking') || urlParams.get('invoice') || 'N/A';
     const amount = urlParams.get('amount') || 0;
+    const name = urlParams.get('name') || 'Customer';
+    const status = urlParams.get('status');
 
-    document.getElementById('displayTracking').innerText = trackingNumber;
+    document.getElementById('displayTracking').innerText = tracking;
+    document.getElementById('displayName').innerText = name;
     document.getElementById('displayAmount').innerText = '¥ ' + parseInt(amount).toLocaleString();
 
-    // Stripe Checkout එකට යොමු කිරීම
+    const statusAlert = document.getElementById('statusAlert');
+    if (status === 'success') {
+        statusAlert.className = 'status-msg status-success';
+        statusAlert.innerText = '🎉 Payment successful! Thank you for your business.';
+        statusAlert.style.display = 'block';
+    } else if (status === 'cancelled') {
+        statusAlert.className = 'status-msg status-cancel';
+        statusAlert.innerText = '❌ Payment was cancelled. You can try again below.';
+        statusAlert.style.display = 'block';
+    }
+
     document.getElementById('checkoutBtn').addEventListener('click', async () => {
+        if (!tracking || tracking === 'N/A' || !amount || amount <= 0) {
+            alert('Invalid payment details. Please go back and re-enter your details.');
+            return;
+        }
+
         try {
             const response = await fetch('/create-checkout-session', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ trackingNumber, amount })
+                body: JSON.stringify({
+                    trackingNumber: tracking,
+                    amount: amount,
+                    customerName: name
+                })
             });
 
             const session = await response.json();
             if (session.url) {
-                // Stripe සජීවී ගෙවීම් පිටුවට Redirect කිරීම
                 window.location.href = session.url;
             } else {
-                alert('Error creating payment session. Please try again.');
+                alert('Payment error: ' + (session.error || 'Could not create payment session. Check Stripe Key on Render.'));
             }
         } catch (err) {
             console.error(err);
