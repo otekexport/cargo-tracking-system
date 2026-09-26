@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Payment - Otek Cargo</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f4f7f6; }
+        .payment-card { background: white; padding: 25px; border-radius: 8px; max-width: 450px; margin: 40px auto; box-shadow: 0 4px 12px rgba(0,0,0,0.15); text-align: center; }
+        .pay-btn { background-color: #00d4b6; color: #000; padding: 14px; border: none; border-radius: 6px; font-size: 18px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 20px; }
+        .pay-btn:hover { background-color: #00b89e; }
+        .details { background: #eef2f5; padding: 15px; border-radius: 6px; margin-bottom: 20px; text-align: left; }
+    </style>
+</head>
+<body>
+
+<div class="payment-card">
+    <h2>💳 Complete Your Payment</h2>
+    
+    <div class="details">
+        <p><strong>Tracking Number:</strong> <span id="displayTracking">Loading...</span></p>
+        <p><strong>Total Amount:</strong> <span id="displayAmount">Loading...</span></p>
+    </div>
+
+    <button class="pay-btn" id="checkoutBtn">Proceed to Stripe Payment</button>
+</div>
+
+<script>
+    // URL Parameters කියවා ගැනීම
+    const urlParams = new URLSearchParams(window.location.search);
+    const trackingNumber = urlParams.get('tracking') || 'N/A';
+    const amount = urlParams.get('amount') || 0;
+
+    document.getElementById('displayTracking').innerText = trackingNumber;
+    document.getElementById('displayAmount').innerText = '¥ ' + parseInt(amount).toLocaleString();
+
+    // Stripe Checkout එකට යොමු කිරීම
+    document.getElementById('checkoutBtn').addEventListener('click', async () => {
+        try {
+            const response = await fetch('/create-checkout-session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ trackingNumber, amount })
+            });
+
+            const session = await response.json();
+            if (session.url) {
+                // Stripe සජීවී ගෙවීම් පිටුවට Redirect කිරීම
+                window.location.href = session.url;
+            } else {
+                alert('Error creating payment session. Please try again.');
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Server error. Could not proceed to payment.');
+        }
+    });
+</script>
+
+</body>
+</html>
