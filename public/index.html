@@ -59,40 +59,6 @@
             border: 1px solid rgba(255, 215, 0, 0.2);
         }
 
-        /* App Download Banner Styling */
-        .app-download-banner {
-            background: linear-gradient(135deg, #FFD700, #ffa500);
-            color: #05131f;
-            padding: 12px 18px;
-            border-radius: 12px;
-            margin-bottom: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-weight: bold;
-            box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        .app-download-btn {
-            background: #05131f;
-            color: #FFD700;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 25px;
-            font-weight: bold;
-            font-size: 14px;
-            cursor: pointer;
-            transition: transform 0.2s, background 0.2s;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .app-download-btn:hover {
-            transform: scale(1.05);
-            background: #0b253a;
-        }
-
         .nav-buttons { 
             display: flex; 
             justify-content: space-between; 
@@ -395,8 +361,43 @@
             transform: translateY(-2px);
         }
 
+        /* App Download Banner Styling (Bottom Positioned) */
+        .app-download-banner {
+            background: linear-gradient(135deg, #FFD700, #ffa500);
+            color: #05131f;
+            padding: 14px 20px;
+            border-radius: 12px;
+            margin-top: 30px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .app-download-btn {
+            background: #05131f;
+            color: #FFD700;
+            border: none;
+            padding: 10px 22px;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            transition: transform 0.2s, background 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .app-download-btn:hover {
+            transform: scale(1.05);
+            background: #0b253a;
+        }
+
         .footer-section {
-            margin-top: 35px;
+            margin-top: 20px;
             padding-top: 18px;
             border-top: 1px solid #e2e8f0;
             text-align: center;
@@ -437,14 +438,6 @@
     <canvas id="starCanvas"></canvas>
 
     <div class="card">
-        
-        <!-- 📱 Mobile App Download Banner -->
-        <div class="app-download-banner">
-            <span>📲 Get Otek Export Mobile App on your Phone!</span>
-            <button type="button" class="app-download-btn" onclick="installMobileApp()">
-                📥 Download App
-            </button>
-        </div>
 
         <!-- Main Top Navigation Buttons -->
         <div class="nav-buttons">
@@ -550,6 +543,14 @@
             </div>
         </div>
 
+        <!-- 📱 Mobile App Download Banner (Moved to Bottom) -->
+        <div class="app-download-banner">
+            <span>📲 Get Otek Export Mobile App on your Phone!</span>
+            <button type="button" class="app-download-btn" onclick="installMobileApp()">
+                📥 Download App
+            </button>
+        </div>
+
         <div class="footer-section">
             <div>© 2026 Otek Export & Panorama Cargo Logistics. All Rights Reserved.</div>
             <div class="developer-tag">System Developed & Maintained by <strong>tera_web service</strong></div>
@@ -589,7 +590,7 @@
                     deferredPrompt = null;
                 });
             } else if (isIOS) {
-                alert("🍎 iPhone (iOS) සඳහා App එක Install කරගැනීමට:\n\n1. Safari බ්‍රවුසරයේ පහළ ඇති Share icon (📤) එක ඔබන්න.\n2. 'Add to Home Screen' මත ක්ලික් කර 'Add' දෙන්න.");
+                alert("🍎 iPhone (iOS) සඳහා App එක Install කරගැනීමට:\n\n1. Safari හෝ Chrome බ්‍රවුසරයේ Share icon (📤) එක ඔබන්න.\n2. 'Add to Home Screen' මත ක්ලික් කර 'Add' දෙන්න.");
             } else {
                 alert("📱 Android හි App එක Install කිරීමට:\n\nChrome බ්‍රවුසරයේ උඩ දකුණු කෙළවරේ තිත් 3 ඔබා 'Install App' හෝ 'Add to Home Screen' ලබාදෙන්න.");
             }
