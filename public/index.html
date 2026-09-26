@@ -361,6 +361,25 @@
             transform: translateY(-2px);
         }
 
+        /* 3 Languages Fee Notice Styling */
+        .trilingual-notice {
+            background: #fffbe0;
+            border: 1px solid #fce8a6;
+            padding: 12px 15px;
+            border-radius: 8px;
+            margin: 12px 0;
+            font-size: 12px;
+            line-height: 1.6;
+            color: #744210;
+            text-align: left;
+        }
+        .trilingual-notice div {
+            margin-bottom: 4px;
+        }
+        .trilingual-notice div:last-child {
+            margin-bottom: 0;
+        }
+
         /* App Download Banner Styling (Bottom Positioned) */
         .app-download-banner {
             background: linear-gradient(135deg, #FFD700, #ffa500);
@@ -475,10 +494,33 @@
                 <label>Invoice Number (ඉන්වොයිස් අංකය):</label>
                 <input type="text" id="customInv" placeholder="e.g. INV-1001">
 
-                <label>Payment Amount JPY (ගෙවන මුදල - යෙන්):</label>
-                <input type="number" id="customAmount" placeholder="e.g. 15000">
+                <label>Base Invoice Amount JPY (මුලික ගෙවන මුදල - යෙන්):</label>
+                <input type="number" id="customAmount" placeholder="e.g. 15000" oninput="calculateDirectFee()">
 
-                <button class="stripe-pay-btn" style="width: 100%; border-radius: 8px; margin-top: 15px; font-size: 16px; padding: 14px;" onclick="makeDirectPayment()">
+                <!-- Dynamic Calculation Breakdown Box -->
+                <div id="directCalcBox" style="display:none; background: #e0f2fe; border: 1px solid #bae6fd; padding: 15px; border-radius: 8px; margin: 12px 0;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:13px; color:#0369a1;">
+                        <span>Base Amount (මුලික මුදල):</span>
+                        <strong id="dispBase">¥0</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:13px; color:#0369a1;">
+                        <span>Card Fee 3.5% (කාඩ්පත් ගාස්තුව):</span>
+                        <strong id="dispFee">¥0</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; padding-top:6px; border-top:1px dashed #7dd3fc; font-size:15px; color:#0c4a6e; font-weight:bold;">
+                        <span>Total Amount to Pay (මුළු මුදල):</span>
+                        <strong id="dispTotal" style="color:#0284c7;">¥0</strong>
+                    </div>
+                </div>
+
+                <!-- 3 Languages Fee Notice -->
+                <div class="trilingual-notice">
+                    <div>📌 <strong>English:</strong> Note: A 3.5% card processing fee is included in the total payment amount.</div>
+                    <div>📌 <strong>සිංහල:</strong> සටහන: මෙම මුළු මුදලට 3.5% ක කාඩ්පත් සේවා ගාස්තුවක් ඇතුළත් කර ඇත.</div>
+                    <div>📌 <strong>தமிழ்:</strong> குறிப்பு: இந்த மொத்தத் தொகையில் 3.5% கார்டு செயலாக்கக் கட்டணம் சேர்க்கப்பட்டுள்ளது.</div>
+                </div>
+
+                <button class="stripe-pay-btn" style="width: 100%; border-radius: 8px; margin-top: 10px; font-size: 16px; padding: 14px;" onclick="makeDirectPayment()">
                     💳 Proceed to Payment Page (ගෙවීම් පිටුවට යන්න)
                 </button>
             </div>
@@ -543,7 +585,7 @@
             </div>
         </div>
 
-        <!-- 📱 Mobile App Download Banner (Moved to Bottom) -->
+        <!-- 📱 Mobile App Download Banner (Bottom) -->
         <div class="app-download-banner">
             <span>📲 Get Otek Export Mobile App on your Phone!</span>
             <button type="button" class="app-download-btn" onclick="installMobileApp()">
@@ -593,6 +635,21 @@
                 alert("🍎 iPhone (iOS) සඳහා App එක Install කරගැනීමට:\n\n1. Safari හෝ Chrome බ්‍රවුසරයේ Share icon (📤) එක ඔබන්න.\n2. 'Add to Home Screen' මත ක්ලික් කර 'Add' දෙන්න.");
             } else {
                 alert("📱 Android හි App එක Install කිරීමට:\n\nChrome බ්‍රවුසරයේ උඩ දකුණු කෙළවරේ තිත් 3 ඔබා 'Install App' හෝ 'Add to Home Screen' ලබාදෙන්න.");
+            }
+        }
+
+        function calculateDirectFee() {
+            const val = parseFloat(document.getElementById('customAmount').value) || 0;
+            const box = document.getElementById('directCalcBox');
+            if (val > 0) {
+                const fee = Math.round(val * 0.035);
+                const total = val + fee;
+                document.getElementById('dispBase').innerText = '¥ ' + val.toLocaleString();
+                document.getElementById('dispFee').innerText = '¥ ' + fee.toLocaleString();
+                document.getElementById('dispTotal').innerText = '¥ ' + total.toLocaleString();
+                box.style.display = 'block';
+            } else {
+                box.style.display = 'none';
             }
         }
 
@@ -724,7 +781,9 @@
             const div = document.getElementById('result');
             if(data.success) {
                 const activeStep = getActiveStep(data.data.status, data.data.arrival_date);
-                const itemAmount = data.data.amount || 0;
+                const baseAmount = data.data.amount || 0;
+                const cardFee = Math.round(baseAmount * 0.035);
+                const totalAmount = baseAmount + cardFee;
 
                 const steps = [
                     { num: 1, title: "Cargo Received & Packed (Japan)", icon: "📦" },
@@ -766,19 +825,41 @@
                         <div class="result-item"><strong>Clearing Warehouse:</strong> ${data.data.clearing_warehouse || '-'}</div>
                         <div class="result-item"><strong>Invoice Number:</strong> ${data.data.invoice_number || '-'}</div>
                         <div class="result-item"><strong>Customer Name:</strong> ${data.data.customer_name || '-'}</div>
-                        <div class="result-item"><strong>Invoice Amount:</strong> ¥${itemAmount.toLocaleString()} JPY</div>
+                        <div class="result-item"><strong>Base Invoice Amount:</strong> ¥${baseAmount.toLocaleString()} JPY</div>
                         <div class="result-item"><strong>Status:</strong> ${data.data.status || '-'}</div>
                         <div class="result-item"><strong>Destination:</strong> ${data.data.destination || '-'}</div>
                     </div>
 
                     ${timelineHtml}
 
-                    <!-- 💳 Card Payment Option Box -->
+                    <!-- 💳 Card Payment Option Box with 3.5% Fee -->
                     <div style="margin-top:20px; padding:18px; background:#f5f3ff; border:1px solid #ddd6fe; border-radius:12px; text-align:center;">
                         <h4 style="margin:0 0 8px 0; color:#5b21b6;">💳 Online Card Payment (Stripe)</h4>
-                        <p style="margin:0 0 12px 0; font-size:13px; color:#4c1d95;">Pay freight charges securely using Credit/Debit Card (Visa, Mastercard, AMEX, Apple Pay).</p>
-                        <button class="stripe-pay-btn" onclick="goToPaymentPage('${data.data.invoice_number}', '${data.data.customer_name}', ${itemAmount})">
-                            💳 Pay Invoice via Card (¥${itemAmount.toLocaleString()})
+                        
+                        <div style="background:white; padding:12px; border-radius:8px; border:1px solid #e9d5ff; margin-bottom:12px; font-size:13px; text-align:left;">
+                            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                                <span>Freight Charge:</span>
+                                <strong>¥${baseAmount.toLocaleString()}</strong>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; margin-bottom:4px; color:#6b21a8;">
+                                <span>Card Processing Fee (3.5%):</span>
+                                <strong>¥${cardFee.toLocaleString()}</strong>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; padding-top:4px; border-top:1px dashed #ddd6fe; font-size:14px; color:#5b21b6; font-weight:bold;">
+                                <span>Total Payable Amount:</span>
+                                <strong>¥${totalAmount.toLocaleString()} JPY</strong>
+                            </div>
+                        </div>
+
+                        <!-- 3 Languages Fee Notice -->
+                        <div class="trilingual-notice">
+                            <div>📌 <strong>English:</strong> Note: A 3.5% card processing fee is included in the total payment amount.</div>
+                            <div>📌 <strong>සිංහල:</strong> සටහන: මෙම මුළු මුදලට 3.5% ක කාඩ්පත් සේවා ගාස්තුවක් ඇතුළත් කර ඇත.</div>
+                            <div>📌 <strong>தமிழ்:</strong> குறிப்பு: இந்த மொத்தத் தொகையில் 3.5% கார்டு செயலாக்கக் கட்டணம் சேர்க்கப்பட்டுள்ளது.</div>
+                        </div>
+
+                        <button class="stripe-pay-btn" style="margin-top:8px;" onclick="goToPaymentPage('${data.data.invoice_number}', '${data.data.customer_name}', ${baseAmount})">
+                            💳 Pay Invoice via Card (¥${totalAmount.toLocaleString()})
                         </button>
                     </div>
 
@@ -866,25 +947,25 @@
             }
         }
 
-        function goToPaymentPage(invoiceNumber, customerName, amount) {
-            if (!amount || amount <= 0) {
+        function goToPaymentPage(invoiceNumber, customerName, baseAmount) {
+            if (!baseAmount || baseAmount <= 0) {
                 return alert('මේ Invoice එක සඳහා ගෙවීමට අදාළ මුදල (Amount) තවමත් Admin විසින් ඇතුළත් කර නොමැත.');
             }
-            window.location.href = `/payment.html?tracking=${encodeURIComponent(invoiceNumber)}&amount=${amount}&name=${encodeURIComponent(customerName)}`;
+            window.location.href = `/payment.html?tracking=${encodeURIComponent(invoiceNumber)}&amount=${baseAmount}&name=${encodeURIComponent(customerName)}`;
         }
 
         function makeDirectPayment() {
             const name = document.getElementById('customName').value.trim();
             const email = document.getElementById('customEmail').value.trim();
             const inv = document.getElementById('customInv').value.trim();
-            const amount = parseFloat(document.getElementById('customAmount').value);
+            const baseAmount = parseFloat(document.getElementById('customAmount').value);
 
             if (!name) return alert('කරුණාකර ඔබගේ නම (Customer Name) ඇතුළත් කරන්න.');
             if (!email || !email.includes('@')) return alert('කරුණාකර නිවැරදි Email ලිපිනයක් ඇතුළත් කරන්න.');
             if (!inv) return alert('කරුණාකර Invoice Number එක ඇතුළත් කරන්න.');
-            if (!amount || amount <= 0) return alert('කරුණාකර ගෙවීමට අදාළ මුදල (Amount JPY) නිවැරදිව ඇතුළත් කරන්න.');
+            if (!baseAmount || baseAmount <= 0) return alert('කරුණාකර ගෙවීමට අදාළ මුදල (Amount JPY) නිවැරදිව ඇතුළත් කරන්න.');
 
-            window.location.href = `/payment.html?tracking=${encodeURIComponent(inv)}&amount=${amount}&name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}`;
+            window.location.href = `/payment.html?tracking=${encodeURIComponent(inv)}&amount=${baseAmount}&name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}`;
         }
 
         function showPolicy(type) {
