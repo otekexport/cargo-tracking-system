@@ -349,7 +349,29 @@
             <label>Invoice Number:</label>
             <input type="text" id="invoice" placeholder="e.g. INV-1001" onkeypress="if(event.key === 'Enter') track()">
             <button class="submit-btn" onclick="track()">Track Status</button>
+            
             <div id="result"></div>
+
+            <div class="section-divider"></div>
+
+            <!-- 💳 Direct / Custom Payment Form (සෘජු ගෙවීම් කොටස) -->
+            <div style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 22px; border-radius: 12px; margin-top: 20px;">
+                <h4 style="margin: 0 0 8px 0; color: #0b253a; text-align: center; font-size: 17px;">💳 Direct Invoice Payment (සෘජු ගෙවීම්)</h4>
+                <p style="margin: 0 0 15px 0; font-size: 13px; color: #64748b; text-align: center;">Tracking සෙවීමකින් තොරව සෘජුවම ඔබගේ ඉන්වොයිසිය සඳහා ගෙවීම් කිරීමට මෙතැන භාවිත කරන්න.</p>
+
+                <label>Customer Name (ඔබගේ නම):</label>
+                <input type="text" id="customName" placeholder="e.g. Kamal Perera">
+
+                <label>Invoice Number (ඉන්වොයිස් අංකය):</label>
+                <input type="text" id="customInv" placeholder="e.g. INV-1001">
+
+                <label>Payment Amount JPY (ගෙවන මුදල - යෙන්):</label>
+                <input type="number" id="customAmount" placeholder="e.g. 15000">
+
+                <button class="stripe-pay-btn" style="width: 100%; border-radius: 8px; margin-top: 10px; font-size: 16px;" onclick="makeDirectPayment()">
+                    💳 Proceed to Payment Page (ගෙවීම් පිටුවට යන්න)
+                </button>
+            </div>
         </div>
 
         <!-- Tab 2: Admin View -->
@@ -678,12 +700,25 @@
             }
         }
 
-        // වෙනම ඇති payment.html එකට Redirect කරන Function එක
+        // Tracking පරීක්ෂා කිරීමෙන් පසු යොමු වන Function එක
         function goToPaymentPage(invoiceNumber, customerName, amount) {
             if (!amount || amount <= 0) {
                 return alert('මේ Invoice එක සඳහා ගෙවීමට අදාළ මුදල (Amount) තවමත් Admin විසින් ඇතුළත් කර නොමැත.');
             }
             window.location.href = `/payment.html?tracking=${encodeURIComponent(invoiceNumber)}&amount=${amount}&name=${encodeURIComponent(customerName)}`;
+        }
+
+        // සෘජුවම Custom Details ඇතුළත් කර ගෙවීමට යොමු වන අලුත් Function එක
+        function makeDirectPayment() {
+            const name = document.getElementById('customName').value.trim();
+            const inv = document.getElementById('customInv').value.trim();
+            const amount = parseFloat(document.getElementById('customAmount').value);
+
+            if (!name) return alert('කරුණාකර ඔබගේ නම (Customer Name) ඇතුළත් කරන්න.');
+            if (!inv) return alert('කරුණාකර Invoice Number එක ඇතුළත් කරන්න.');
+            if (!amount || amount <= 0) return alert('කරුණාකර ගෙවීමට අදාළ මුදල (Amount JPY) නිවැරදිව ඇතුළත් කරන්න.');
+
+            window.location.href = `/payment.html?tracking=${encodeURIComponent(inv)}&amount=${amount}&name=${encodeURIComponent(name)}`;
         }
 
         function showPolicy(type) {
