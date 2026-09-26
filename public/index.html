@@ -43,13 +43,37 @@
             border: 1px solid rgba(255, 215, 0, 0.2);
         }
 
-        .nav-buttons { display: flex; justify-content: space-around; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
-        .nav-btn { background: none; border: none; font-size: 16px; font-weight: bold; cursor: pointer; color: #666; padding: 10px 18px; }
-        .nav-btn.active { color: #007bff; border-bottom: 3px solid #007bff; }
+        .nav-buttons { 
+            display: flex; 
+            justify-content: space-between; 
+            gap: 10px;
+            margin-bottom: 20px; 
+            border-bottom: 2px solid #eee; 
+            padding-bottom: 10px; 
+            flex-wrap: wrap;
+        }
+        .nav-btn { 
+            background: none; 
+            border: none; 
+            font-size: 15px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            color: #666; 
+            padding: 10px 14px; 
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+        .nav-btn.active { 
+            color: #007bff; 
+            border-bottom: 3px solid #007bff; 
+            background: rgba(0, 123, 255, 0.05);
+        }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
+        
         label { font-size: 14px; font-weight: bold; color: #333; display: block; margin-top: 12px; }
         input[type="text"], input[type="password"], input[type="number"], input[type="file"] { width: 100%; padding: 12px; margin: 6px 0 12px 0; font-size: 14px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; }
+        
         button.submit-btn { width: 100%; padding: 12px; font-size: 16px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; margin-top: 10px; font-weight: bold; }
         button.admin-btn { background: #007bff; }
         button.bulk-btn { background: #6f42c1; }
@@ -183,6 +207,13 @@
         }
 
         @media (max-width: 650px) {
+            .nav-buttons {
+                justify-content: center;
+            }
+            .nav-btn {
+                font-size: 13px;
+                padding: 8px 10px;
+            }
             .step-list {
                 flex-direction: column;
                 gap: 15px;
@@ -336,12 +367,14 @@
     <canvas id="starCanvas"></canvas>
 
     <div class="card">
+        <!-- 🔝 Main Top Navigation Buttons -->
         <div class="nav-buttons">
             <button class="nav-btn active" id="btn-customer" onclick="switchTab('customer')">📦 Track Cargo</button>
+            <button class="nav-btn" id="btn-payment" onclick="switchTab('payment')">💳 Direct Payment</button>
             <button class="nav-btn" id="btn-admin" onclick="switchTab('admin')">🛠️ Admin Panel</button>
         </div>
 
-        <!-- Tab 1: Customer View -->
+        <!-- Tab 1: Customer View (Track Cargo) -->
         <div id="customer" class="tab-content active">
             <img src="logo.png" alt="Otek Export Logo" class="brand-logo" onerror="this.style.display='none'">
 
@@ -351,14 +384,16 @@
             <button class="submit-btn" onclick="track()">Track Status</button>
             
             <div id="result"></div>
+        </div>
 
-            <div class="section-divider"></div>
+        <!-- Tab 2: Direct Payment View (අලුතින් එකතු කළ කොටස) -->
+        <div id="payment" class="tab-content">
+            <img src="logo.png" alt="Otek Export Logo" class="brand-logo" onerror="this.style.display='none'">
+            
+            <h3 style="margin-top:0; color:#635bff; text-align: center;">💳 Direct Invoice Payment</h3>
+            <p style="margin: 0 0 15px 0; font-size: 13px; color: #64748b; text-align: center;">සෘජුවම ඔබගේ ඉන්වොයිසිය සඳහා ගෙවීම් කිරීමට මෙතැන විස්තර ඇතුළත් කරන්න.</p>
 
-            <!-- 💳 Direct / Custom Payment Form (සෘජු ගෙවීම් කොටස) -->
-            <div style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 22px; border-radius: 12px; margin-top: 20px;">
-                <h4 style="margin: 0 0 8px 0; color: #0b253a; text-align: center; font-size: 17px;">💳 Direct Invoice Payment (සෘජු ගෙවීම්)</h4>
-                <p style="margin: 0 0 15px 0; font-size: 13px; color: #64748b; text-align: center;">Tracking සෙවීමකින් තොරව සෘජුවම ඔබගේ ඉන්වොයිසිය සඳහා ගෙවීම් කිරීමට මෙතැන භාවිත කරන්න.</p>
-
+            <div style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 20px; border-radius: 12px;">
                 <label>Customer Name (ඔබගේ නම):</label>
                 <input type="text" id="customName" placeholder="e.g. Kamal Perera">
 
@@ -368,13 +403,13 @@
                 <label>Payment Amount JPY (ගෙවන මුදල - යෙන්):</label>
                 <input type="number" id="customAmount" placeholder="e.g. 15000">
 
-                <button class="stripe-pay-btn" style="width: 100%; border-radius: 8px; margin-top: 10px; font-size: 16px;" onclick="makeDirectPayment()">
+                <button class="stripe-pay-btn" style="width: 100%; border-radius: 8px; margin-top: 15px; font-size: 16px; padding: 14px;" onclick="makeDirectPayment()">
                     💳 Proceed to Payment Page (ගෙවීම් පිටුවට යන්න)
                 </button>
             </div>
         </div>
 
-        <!-- Tab 2: Admin View -->
+        <!-- Tab 3: Admin View -->
         <div id="admin" class="tab-content">
             <h3 style="margin-top:0; color:#007bff; text-align: center;">Admin Panel</h3>
             
@@ -531,10 +566,14 @@
         const WHATSAPP_NUMBER_2 = "94740304400";
         const WHATSAPP_NUMBER_3 = "94740104400";
 
+        // Tabs 3ක් මාරු කිරීමට Update කළ Function එක
         function switchTab(tabName) {
             document.getElementById('customer').classList.remove('active');
+            document.getElementById('payment').classList.remove('active');
             document.getElementById('admin').classList.remove('active');
+            
             document.getElementById('btn-customer').classList.remove('active');
+            document.getElementById('btn-payment').classList.remove('active');
             document.getElementById('btn-admin').classList.remove('active');
             
             document.getElementById(tabName).classList.add('active');
@@ -708,7 +747,7 @@
             window.location.href = `/payment.html?tracking=${encodeURIComponent(invoiceNumber)}&amount=${amount}&name=${encodeURIComponent(customerName)}`;
         }
 
-        // සෘජුවම Custom Details ඇතුළත් කර ගෙවීමට යොමු වන අලුත් Function එක
+        // Direct Payment Tab එකෙන් කෙළින්ම ගෙවීමට යොමු වන Function එක
         function makeDirectPayment() {
             const name = document.getElementById('customName').value.trim();
             const inv = document.getElementById('customInv').value.trim();
