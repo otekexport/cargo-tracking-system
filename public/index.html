@@ -294,17 +294,6 @@
             background: #1eb854;
             transform: translateY(-2px);
         }
-        .time-notice {
-            font-size: 13px;
-            color: #1b5e20;
-            line-height: 1.6;
-            text-align: left;
-            background: white;
-            padding: 12px 15px;
-            border-radius: 8px;
-            border-left: 4px solid #25D366;
-            margin-top: 10px;
-        }
 
         .footer-section {
             margin-top: 35px;
@@ -615,11 +604,11 @@
 
                     ${timelineHtml}
 
-                    <!-- 💳 Dynamic Online Stripe Card Payment Box -->
+                    <!-- 💳 Online Stripe Card Payment Redirect Box -->
                     <div style="margin-top:20px; padding:18px; background:#f5f3ff; border:1px solid #ddd6fe; border-radius:12px; text-align:center;">
                         <h4 style="margin:0 0 8px 0; color:#5b21b6;">💳 Online Card Payment (Stripe)</h4>
                         <p style="margin:0 0 12px 0; font-size:13px; color:#4c1d95;">Pay freight charges securely using Credit/Debit Card (Visa, Mastercard, AMEX, Apple Pay).</p>
-                        <button class="stripe-pay-btn" onclick="payWithStripe('${data.data.invoice_number}', '${data.data.customer_name}', ${itemAmount}, 'jpy')">
+                        <button class="stripe-pay-btn" onclick="goToPaymentPage('${data.data.invoice_number}', '${data.data.customer_name}', ${itemAmount})">
                             💳 Pay Invoice via Card (¥${itemAmount.toLocaleString()})
                         </button>
                     </div>
@@ -689,32 +678,12 @@
             }
         }
 
-        async function payWithStripe(invoiceNumber, customerName, amount, currency = 'jpy') {
+        // වෙනම ඇති payment.html එකට Redirect කරන Function එක
+        function goToPaymentPage(invoiceNumber, customerName, amount) {
             if (!amount || amount <= 0) {
                 return alert('මේ Invoice එක සඳහා ගෙවීමට අදාළ මුදල (Amount) තවමත් Admin විසින් ඇතුළත් කර නොමැත.');
             }
-
-            try {
-                const res = await fetch('/api/create-checkout-session', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        invoice_number: invoiceNumber,
-                        customer_name: customerName,
-                        amount: amount,
-                        currency: currency
-                    })
-                });
-
-                const data = await res.json();
-                if (data.success && data.url) {
-                    window.location.href = data.url;
-                } else {
-                    alert('Payment initialization failed: ' + data.message);
-                }
-            } catch (err) {
-                alert('Connection error: ' + err.message);
-            }
+            window.location.href = `/payment.html?tracking=${encodeURIComponent(invoiceNumber)}&amount=${amount}&name=${encodeURIComponent(customerName)}`;
         }
 
         function showPolicy(type) {
