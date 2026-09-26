@@ -4,8 +4,24 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Otek Export Cargo System</title>
+    
+    <!-- PWA & iOS (iPhone) Meta Tags -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#05131f">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Otek Cargo">
+    <link rel="apple-touch-icon" href="/logo.png">
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js');
+        }
+    </script>
+
     <!-- Stripe JS SDK -->
     <script src="https://js.stripe.com/v3/"></script>
+
     <style>
         body { 
             font-family: Arial, sans-serif; 
@@ -41,6 +57,40 @@
             margin-top: 20px;
             box-sizing: border-box;
             border: 1px solid rgba(255, 215, 0, 0.2);
+        }
+
+        /* App Download Banner Styling */
+        .app-download-banner {
+            background: linear-gradient(135deg, #FFD700, #ffa500);
+            color: #05131f;
+            padding: 12px 18px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .app-download-btn {
+            background: #05131f;
+            color: #FFD700;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            transition: transform 0.2s, background 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .app-download-btn:hover {
+            transform: scale(1.05);
+            background: #0b253a;
         }
 
         .nav-buttons { 
@@ -387,6 +437,15 @@
     <canvas id="starCanvas"></canvas>
 
     <div class="card">
+        
+        <!-- 📱 Mobile App Download Banner -->
+        <div class="app-download-banner">
+            <span>📲 Get Otek Export Mobile App on your Phone!</span>
+            <button type="button" class="app-download-btn" onclick="installMobileApp()">
+                📥 Download App
+            </button>
+        </div>
+
         <!-- Main Top Navigation Buttons -->
         <div class="nav-buttons">
             <button class="nav-btn active" id="btn-customer" onclick="switchTab('customer')">📦 Track Cargo</button>
@@ -423,7 +482,7 @@
                 <label>Invoice Number (ඉන්වොයිස් අංකය):</label>
                 <input type="text" id="customInv" placeholder="e.g. INV-1001">
 
-                <label>Payment Amount JPY (ගෙවන මුදල - JPY):</label>
+                <label>Payment Amount JPY (ගෙවන මුදල - යෙන්):</label>
                 <input type="number" id="customAmount" placeholder="e.g. 15000">
 
                 <button class="stripe-pay-btn" style="width: 100%; border-radius: 8px; margin-top: 15px; font-size: 16px; padding: 14px;" onclick="makeDirectPayment()">
@@ -511,6 +570,31 @@
     </div>
 
     <script>
+        // 📱 PWA App Download Prompt Handling Script
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+        });
+
+        function installMobileApp() {
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') {
+                        console.log('User accepted the install prompt');
+                    }
+                    deferredPrompt = null;
+                });
+            } else if (isIOS) {
+                alert("🍎 iPhone (iOS) සඳහා App එක Install කරගැනීමට:\n\n1. Safari බ්‍රවුසරයේ පහළ ඇති Share icon (📤) එක ඔබන්න.\n2. 'Add to Home Screen' මත ක්ලික් කර 'Add' දෙන්න.");
+            } else {
+                alert("📱 Android හි App එක Install කිරීමට:\n\nChrome බ්‍රවුසරයේ උඩ දකුණු කෙළවරේ තිත් 3 ඔබා 'Install App' හෝ 'Add to Home Screen' ලබාදෙන්න.");
+            }
+        }
+
         // 🌟 Gold Stars & Gold "Otek" Text Falling Animation Script
         const canvas = document.getElementById('starCanvas');
         const ctx = canvas.getContext('2d');
@@ -527,7 +611,7 @@
             stars = [];
             const count = Math.floor(window.innerWidth / 12);
             for (let i = 0; i < count; i++) {
-                const isText = (i % 5 === 0); // 20% Text ("Otek"), 80% Gold Stars
+                const isText = (i % 5 === 0);
                 stars.push({
                     isText: isText,
                     x: Math.random() * canvas.width,
@@ -783,7 +867,7 @@
 
         function goToPaymentPage(invoiceNumber, customerName, amount) {
             if (!amount || amount <= 0) {
-                return alert('මේ Invoice එක සඳහා ගෙවීමට අදාළ මුදල (Amount) තවමත් ඇතුළත් කර නොමැත.');
+                return alert('මේ Invoice එක සඳහා ගෙවීමට අදාළ මුදල (Amount) තවමත් Admin විසින් ඇතුළත් කර නොමැත.');
             }
             window.location.href = `/payment.html?tracking=${encodeURIComponent(invoiceNumber)}&amount=${amount}&name=${encodeURIComponent(customerName)}`;
         }
