@@ -24,6 +24,37 @@ const db = new sqlite3.Database(path.join(__dirname, 'cargo.db'), (err) => {
     }
 });
 
+// Table එක සහ අඩු Columns ස්වයංක්‍රීයව සකස් කිරීම
+db.serialize(() => {
+    db.run(`
+        CREATE TABLE IF NOT EXISTS shipments (
+            invoice_number TEXT PRIMARY KEY,
+            customer_name TEXT,
+            arrival_date TEXT,
+            clearing_warehouse TEXT,
+            amount REAL DEFAULT 0,
+            status TEXT,
+            destination TEXT
+        )
+    `);
+
+    // පැරණි Database වල අඩුව ඇති Columns ස්වයංක්‍රීයව එකතු කිරීම
+    const columns = [
+        'customer_name TEXT',
+        'arrival_date TEXT',
+        'clearing_warehouse TEXT',
+        'amount REAL DEFAULT 0',
+        'status TEXT',
+        'destination TEXT'
+    ];
+
+    columns.forEach(col => {
+        db.run(`ALTER TABLE shipments ADD COLUMN ${col}`, (err) => {
+            // Column එක දැනටමත් තිබේ නම් එන Error එක Ignore කරනු ලැබේ
+        });
+    });
+});
+
 // Table එක නැත්නම් නිර්මාණය කිරීම
 db.run(`
     CREATE TABLE IF NOT EXISTS shipments (
