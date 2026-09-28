@@ -5,114 +5,47 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Secure Payment - Otek Export Cargo</title>
     <style>
-        * {
-            box-sizing: border-box;
-            font-family: Arial, sans-serif;
-        }
+        * { box-sizing: border-box; font-family: Arial, sans-serif; }
         body {
             background: linear-gradient(135deg, #05131f, #0b253a, #113856);
-            margin: 0;
-            padding: 20px;
-            color: #333;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
+            margin: 0; padding: 20px; color: #333;
+            display: flex; justify-content: center; align-items: center; min-height: 100vh;
         }
         .payment-card {
             background: rgba(255, 255, 255, 0.96);
-            padding: 35px;
-            border-radius: 16px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-            max-width: 480px;
-            width: 100%;
-            text-align: center;
+            padding: 35px; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            max-width: 500px; width: 100%; text-align: center;
         }
-        .payment-card h2 {
-            margin-top: 0;
-            color: #0b253a;
-            font-size: 22px;
-        }
-        .subtitle {
-            color: #64748b;
-            font-size: 14px;
-            margin-bottom: 20px;
-        }
+        .payment-card h2 { margin-top: 0; color: #0b253a; font-size: 22px; }
+        .subtitle { color: #64748b; font-size: 14px; margin-bottom: 20px; }
         .details-box {
-            background: #f8fafc;
-            border: 1px solid #cbd5e1;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 25px;
-            text-align: left;
+            background: #f8fafc; border: 1px solid #cbd5e1;
+            padding: 20px; border-radius: 10px; margin-bottom: 20px; text-align: left;
         }
-        .detail-row {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 12px;
-            font-size: 15px;
+        .detail-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
+        .detail-label { color: #64748b; }
+        .detail-value { color: #0f172a; font-weight: 600; word-break: break-all; }
+        .amount-highlight { color: #16a34a; font-size: 20px; font-weight: 800; }
+        
+        .trilingual-notice {
+            background: #fffbe0; border: 1px solid #fce8a6;
+            padding: 12px 15px; border-radius: 8px; margin-bottom: 20px;
+            font-size: 12px; line-height: 1.6; color: #744210; text-align: left;
         }
-        .detail-row:last-child {
-            margin-bottom: 0;
-            padding-top: 12px;
-            border-top: 1px dashed #cbd5e1;
-            font-weight: bold;
-        }
-        .detail-label {
-            color: #64748b;
-        }
-        .detail-value {
-            color: #0f172a;
-            font-weight: 600;
-        }
-        .amount-highlight {
-            color: #16a34a;
-            font-size: 20px;
-            font-weight: 800;
-        }
+        .trilingual-notice div { margin-bottom: 4px; }
+        .trilingual-notice div:last-child { margin-bottom: 0; }
+        
         .pay-btn {
-            background-color: #635bff;
-            color: white;
-            padding: 16px;
-            border: none;
-            border-radius: 8px;
-            font-size: 17px;
-            font-weight: bold;
-            cursor: pointer;
-            width: 100%;
-            transition: background 0.2s;
+            background-color: #635bff; color: white; padding: 16px;
+            border: none; border-radius: 8px; font-size: 17px; font-weight: bold;
+            cursor: pointer; width: 100%; transition: background 0.2s;
         }
-        .pay-btn:hover {
-            background-color: #4b45e4;
-        }
-        .status-msg {
-            margin-bottom: 20px;
-            padding: 12px;
-            border-radius: 8px;
-            font-weight: bold;
-            display: none;
-        }
-        .status-success {
-            background-color: #dcfce7;
-            color: #15803d;
-            border: 1px solid #bbf7d0;
-        }
-        .status-cancel {
-            background-color: #fef2f2;
-            color: #dc2626;
-            border: 1px solid #fecaca;
-        }
-        .back-link {
-            display: inline-block;
-            margin-top: 20px;
-            color: #007bff;
-            text-decoration: none;
-            font-size: 14px;
-            font-weight: bold;
-        }
-        .back-link:hover {
-            text-decoration: underline;
-        }
+        .pay-btn:hover { background-color: #4b45e4; }
+        .status-msg { margin-bottom: 20px; padding: 12px; border-radius: 8px; font-weight: bold; display: none; }
+        .status-success { background-color: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+        .status-cancel { background-color: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+        .back-link { display: inline-block; margin-top: 20px; color: #007bff; text-decoration: none; font-size: 14px; font-weight: bold; }
+        .back-link:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -129,13 +62,31 @@
             <span class="detail-value" id="displayName">Loading...</span>
         </div>
         <div class="detail-row">
+            <span class="detail-label">Email Address:</span>
+            <span class="detail-value" id="displayEmail">Not Provided</span>
+        </div>
+        <div class="detail-row">
             <span class="detail-label">Invoice / Tracking:</span>
             <span class="detail-value" id="displayTracking">Loading...</span>
         </div>
         <div class="detail-row">
-            <span class="detail-label">Total Payable:</span>
-            <span class="amount-highlight" id="displayAmount">Loading...</span>
+            <span class="detail-label">Base Invoice Amount:</span>
+            <span class="detail-value" id="displayBase">Loading...</span>
         </div>
+        <div class="detail-row">
+            <span class="detail-label">Card Processing Fee (3.5%):</span>
+            <span class="detail-value" id="displayFee" style="color:#6b21a8;">Loading...</span>
+        </div>
+        <div class="detail-row" style="padding-top:10px; border-top:1px dashed #cbd5e1; margin-top:10px;">
+            <span class="detail-label" style="font-weight:bold; color:#0b253a;">Total Payable Amount:</span>
+            <span class="amount-highlight" id="displayTotal">Loading...</span>
+        </div>
+    </div>
+
+    <div class="trilingual-notice">
+        <div>📌 <strong>English:</strong> Note: A 3.5% card processing fee is included in the total payment amount.</div>
+        <div>📌 <strong>සිංහල:</strong> සටහන: මෙම මුළු මුදලට 3.5% ක කාඩ්පත් සේවා ගාස්තුවක් ඇතුළත් කර ඇත.</div>
+        <div>📌 <strong>தமிழ்:</strong> குறிப்பு: இந்த மொத்தத் தொகையில் 3.5% கார்டு செயலாக்கக் கட்டணம் சேர்க்கப்பட்டுள்ளது.</div>
     </div>
 
     <button class="pay-btn" id="checkoutBtn">Proceed to Stripe Payment</button>
@@ -147,13 +98,20 @@
 <script>
     const urlParams = new URLSearchParams(window.location.search);
     const tracking = urlParams.get('tracking') || urlParams.get('invoice') || 'N/A';
-    const amount = urlParams.get('amount') || 0;
+    const baseAmount = parseFloat(urlParams.get('amount')) || 0;
     const name = urlParams.get('name') || 'Customer';
+    const email = urlParams.get('email') || '';
     const status = urlParams.get('status');
+
+    const feeAmount = Math.round(baseAmount * 0.035);
+    const totalAmount = baseAmount + feeAmount;
 
     document.getElementById('displayTracking').innerText = tracking;
     document.getElementById('displayName').innerText = name;
-    document.getElementById('displayAmount').innerText = '¥ ' + parseInt(amount).toLocaleString();
+    document.getElementById('displayEmail').innerText = email || 'Will be requested at Stripe Checkout';
+    document.getElementById('displayBase').innerText = '¥ ' + baseAmount.toLocaleString();
+    document.getElementById('displayFee').innerText = '¥ ' + feeAmount.toLocaleString();
+    document.getElementById('displayTotal').innerText = '¥ ' + totalAmount.toLocaleString();
 
     const statusAlert = document.getElementById('statusAlert');
     if (status === 'success') {
@@ -167,8 +125,8 @@
     }
 
     document.getElementById('checkoutBtn').addEventListener('click', async () => {
-        if (!tracking || tracking === 'N/A' || !amount || amount <= 0) {
-            alert('Invalid payment details. Please go back and re-enter your details.');
+        if (!tracking || tracking === 'N/A') {
+            alert('Invalid payment details. Please re-enter your invoice.');
             return;
         }
 
@@ -178,8 +136,9 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     trackingNumber: tracking,
-                    amount: amount,
-                    customerName: name
+                    customAmount: baseAmount,
+                    customerName: name,
+                    customerEmail: email
                 })
             });
 
@@ -187,7 +146,7 @@
             if (session.url) {
                 window.location.href = session.url;
             } else {
-                alert('Payment error: ' + (session.error || 'Could not create payment session. Check Stripe Key on Render.'));
+                alert('Payment error: ' + (session.error || 'Could not create payment session. Check Stripe Key.'));
             }
         } catch (err) {
             console.error(err);
