@@ -361,7 +361,6 @@
             transform: translateY(-2px);
         }
 
-        /* 3 Languages Fee Notice Styling */
         .trilingual-notice {
             background: #fffbe0;
             border: 1px solid #fce8a6;
@@ -380,7 +379,6 @@
             margin-bottom: 0;
         }
 
-        /* App Download Banner Styling (Bottom Positioned) */
         .app-download-banner {
             background: linear-gradient(135deg, #FFD700, #ffa500);
             color: #05131f;
@@ -453,12 +451,10 @@
 </head>
 <body>
 
-    <!-- Background Canvas for Gold Stars & "Otek" Floating Animation -->
     <canvas id="starCanvas"></canvas>
 
     <div class="card">
 
-        <!-- Main Top Navigation Buttons -->
         <div class="nav-buttons">
             <button class="nav-btn active" id="btn-customer" onclick="switchTab('customer')">📦 Track Cargo</button>
             <button class="nav-btn" id="btn-payment" onclick="switchTab('payment')">💳 Direct Payment</button>
@@ -497,7 +493,6 @@
                 <label>Base Invoice Amount JPY (මුලික ගෙවන මුදල - යෙන්):</label>
                 <input type="number" id="customAmount" placeholder="e.g. 15000" oninput="calculateDirectFee()">
 
-                <!-- Dynamic Calculation Breakdown Box -->
                 <div id="directCalcBox" style="display:none; background: #e0f2fe; border: 1px solid #bae6fd; padding: 15px; border-radius: 8px; margin: 12px 0;">
                     <div style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:13px; color:#0369a1;">
                         <span>Base Amount (මුලික මුදල):</span>
@@ -513,7 +508,6 @@
                     </div>
                 </div>
 
-                <!-- 3 Languages Fee Notice -->
                 <div class="trilingual-notice">
                     <div>📌 <strong>English:</strong> Note: A 3.5% card processing fee is included in the total payment amount.</div>
                     <div>📌 <strong>සිංහල:</strong> සටහන: මෙම මුළු මුදලට 3.5% ක කාඩ්පත් සේවා ගාස්තුවක් ඇතුළත් කර ඇත.</div>
@@ -543,7 +537,6 @@
 
                 <div class="section-divider"></div>
 
-                <!-- Single Cargo Update -->
                 <h4 style="margin: 0 0 5px 0;">Single Cargo Update</h4>
                 <label>Arrival Date:</label>
                 <input type="text" id="arrivalDate" placeholder="e.g. October 20, 2026" onkeypress="if(event.key === 'Enter') updateShipment()">
@@ -564,7 +557,6 @@
 
                 <div class="section-divider"></div>
 
-                <!-- Delete Cargo Section -->
                 <h4 style="margin: 0 0 5px 0; color: #dc3545;">Delete Cargo Record</h4>
                 <label>Invoice Number to Delete:</label>
                 <input type="text" id="deleteInv" placeholder="e.g. INV-1001" onkeypress="if(event.key === 'Enter') deleteShipment()">
@@ -573,7 +565,6 @@
 
                 <div class="section-divider"></div>
 
-                <!-- Bulk CSV Upload -->
                 <h4 style="margin: 0 0 5px 0;">Bulk Upload (CSV File)</h4>
                 <label>Select CSV File:</label>
                 <input type="file" id="csvFile" accept=".csv">
@@ -585,7 +576,6 @@
             </div>
         </div>
 
-        <!-- 📱 Mobile App Download Banner (Bottom) -->
         <div class="app-download-banner">
             <span>📲 Get Otek Export Mobile App on your Phone!</span>
             <button type="button" class="app-download-btn" onclick="installMobileApp()">
@@ -613,7 +603,6 @@
     </div>
 
     <script>
-        // 📱 PWA App Download Prompt Handling Script
         let deferredPrompt;
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
@@ -627,7 +616,7 @@
                 deferredPrompt.prompt();
                 deferredPrompt.userChoice.then((choiceResult) => {
                     if (choiceResult.outcome === 'accepted') {
-                        console.log('User accepted the install prompt');
+                        console.log('User accepted prompt');
                     }
                     deferredPrompt = null;
                 });
@@ -653,7 +642,6 @@
             }
         }
 
-        // 🌟 Gold Stars & Gold "Otek" Text Falling Animation Script
         const canvas = document.getElementById('starCanvas');
         const ctx = canvas.getContext('2d');
         let stars = [];
@@ -832,7 +820,6 @@
 
                     ${timelineHtml}
 
-                    <!-- 💳 Card Payment Option Box with 3.5% Fee -->
                     <div style="margin-top:20px; padding:18px; background:#f5f3ff; border:1px solid #ddd6fe; border-radius:12px; text-align:center;">
                         <h4 style="margin:0 0 8px 0; color:#5b21b6;">💳 Online Card Payment (Stripe)</h4>
                         
@@ -851,7 +838,6 @@
                             </div>
                         </div>
 
-                        <!-- 3 Languages Fee Notice -->
                         <div class="trilingual-notice">
                             <div>📌 <strong>English:</strong> Note: A 3.5% card processing fee is included in the total payment amount.</div>
                             <div>📌 <strong>සිංහල:</strong> සටහන: මෙම මුළු මුදලට 3.5% ක කාඩ්පත් සේවා ගාස්තුවක් ඇතුළත් කර ඇත.</div>
@@ -863,14 +849,12 @@
                         </button>
                     </div>
 
-                    <!-- 🏦 Bank Transfer Toggle Button -->
                     <div style="text-align: center; margin-top: 18px;">
                         <button type="button" class="toggle-bank-btn" onclick="toggleBankDetails()">
                             🏛️ View Bank Account Details (බැංකු විස්තර බලන්න)
                         </button>
                     </div>
 
-                    <!-- 🏦 Bank Details Container (Hidden by Default) -->
                     <div class="payment-container" id="bankDetailsSection" style="display: none;">
                         
                         <div class="bank-card sl-bank-card">
