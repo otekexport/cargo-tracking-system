@@ -820,6 +820,13 @@
 
                     ${timelineHtml}
 
+                    <!-- 📄 Official PDF Download Button -->
+                    <div style="text-align: center; margin-top: 15px;">
+                        <a href="/api/download-receipt/${encodeURIComponent(data.data.invoice_number)}" target="_blank" style="display: inline-flex; align-items: center; gap: 6px; background-color: #0284c7; color: white; padding: 10px 18px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 13px; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
+                            📄 Download Official PDF Receipt
+                        </a>
+                    </div>
+
                     <!-- ℹ️ Multi-Language Shipping Schedule Disclaimer Box -->
                     <div style="background-color: #f8f9fa; border-left: 4px solid #0284c7; border-radius: 8px; padding: 15px; margin-top: 20px; font-size: 13px; color: #334155; line-height: 1.6; text-align: left;">
                         <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; color: #0369a1; margin-bottom: 8px;">
