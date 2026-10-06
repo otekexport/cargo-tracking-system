@@ -1,7 +1,7 @@
 {
-  "name": "otek-cargo-system",
+  "name": "otek-cargo-tracking",
   "version": "1.0.0",
-  "description": "Secure Cargo Tracking and Payment System for Otek Export",
+  "description": "Cargo Tracking System for Otek Export & Panorama Cargo Logistics",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -12,7 +12,8 @@
     "express": "^4.19.2",
     "express-rate-limit": "^7.2.0",
     "helmet": "^7.1.0",
+    "pdfkit": "^0.15.0",
     "sqlite3": "^5.1.7",
-    "stripe": "^15.10.0"
+    "stripe": "^15.0.0"
   }
 }
