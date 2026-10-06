@@ -74,7 +74,7 @@
             <span class="detail-value" id="displayBase">Loading...</span>
         </div>
         <div class="detail-row">
-            <span class="detail-label">Card Processing Fee (3.5%):</span>
+            <span class="detail-label">Card Processing Fee (4.2%):</span>
             <span class="detail-value" id="displayFee" style="color:#6b21a8;">Loading...</span>
         </div>
         <div class="detail-row" style="padding-top:10px; border-top:1px dashed #cbd5e1; margin-top:10px;">
@@ -83,10 +83,11 @@
         </div>
     </div>
 
+    <!-- ℹ️ Multi-Language 4.2% Notice Box -->
     <div class="trilingual-notice">
-        <div>📌 <strong>English:</strong> Note: A 3.5% card processing fee is included in the total payment amount.</div>
-        <div>📌 <strong>සිංහල:</strong> සටහන: මෙම මුළු මුදලට 3.5% ක කාඩ්පත් සේවා ගාස්තුවක් ඇතුළත් කර ඇත.</div>
-        <div>📌 <strong>தமிழ்:</strong> குறிப்பு: இந்த மொத்தத் தொகையில் 3.5% கார்டு செயலாக்கக் கட்டணம் சேர்க்கப்பட்டுள்ளது.</div>
+        <div>📌 <strong>English:</strong> Note: A 4.2% card processing fee is included in the total payment amount.</div>
+        <div>📌 <strong>සිංහල:</strong> සටහන: මෙම මුළු මුදලට 4.2% ක කාඩ්පත් සේවා ගාස්තුවක් ඇතුළත් කර ඇත.</div>
+        <div>📌 <strong>தமிழ்:</strong> குறிப்பு: இந்த மொத்தத் தொகையில் 4.2% கார்டு செயலாக்கக் கட்டணம் சேர்க்கப்பட்டுள்ளது.</div>
     </div>
 
     <button class="pay-btn" id="checkoutBtn">Proceed to Stripe Payment</button>
@@ -103,7 +104,8 @@
     const email = urlParams.get('email') || '';
     const status = urlParams.get('status');
 
-    const feeAmount = Math.round(baseAmount * 0.035);
+    // 💳 4.2% Card Processing Fee Calculation
+    const feeAmount = Math.round(baseAmount * 0.042);
     const totalAmount = baseAmount + feeAmount;
 
     document.getElementById('displayTracking').innerText = tracking;
