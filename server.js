@@ -12,32 +12,47 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
-// 🛡️ 1. Security Middleware Headers
+// 🛡️ 1. Proxy Trust Configuration (For Render / Cloudflare Real IP Protection)
+app.set('trust proxy', 1);
+
+// 🛡️ 2. Security Middleware Headers (Helmet + HSTS)
 app.use(helmet({
     contentSecurityPolicy: false, // Stripe JS SDK සහ PWA සහය සඳහා
+    strictTransportSecurity: {
+        maxAge: 31536000,
+        includeSubDomains: true,
+        preload: true
+    }
 }));
-app.use(cors());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// 🛡️ 2. Rate Limiting: General API Routes
+app.use(cors());
+
+// 🛡️ 3. Request Payload Size Limits (DoS & Buffer Overflow Protection)
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+
+// 🛡️ 4. Rate Limiting: General Public API Endpoints
 const generalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // මිනිත්තු 15යි
-    max: 150, // Request 150කට වඩා බාරගන්නේ නැත
-    message: { success: false, message: 'Too many requests, please try again later.' }
+    max: 100,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, message: 'Too many requests from this IP. Please try again after 15 minutes.' }
 });
 
-// 🛡️ 3. Rate Limiting: Admin Security (Brute-Force Protection)
+// 🛡️ 5. Rate Limiting: Admin Brute-Force Protection
 const adminLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 15, // මිනිත්තු 15කදී Admin Request 15කට වඩා සීමා කෙරේ
-    message: { success: false, message: 'Too many admin attempts. Please try again after 15 minutes.' }
+    windowMs: 15 * 60 * 1000, // මිනිත්තු 15යි
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, message: 'Too many admin authorization attempts. Try again after 15 minutes.' }
 });
 
 app.use('/api/', generalLimiter);
 app.use('/api/admin/', adminLimiter);
 
-// Public Folder Serving
+// Public Static File Serving
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Database Connection
@@ -49,7 +64,7 @@ const db = new sqlite3.Database('./cargo.db', (err) => {
     }
 });
 
-// Create Secure Table
+// Database Table Schema Setup
 db.serialize(() => {
     db.run(`
         CREATE TABLE IF NOT EXISTS cargo (
@@ -210,7 +225,7 @@ app.post('/api/admin/bulk-update', (req, res) => {
     });
 });
 
-// 📌 5. Records Fetch Endpoint for /records.html
+// 📌 5. Admin Records Fetch Endpoint
 app.get('/api/admin/records', (req, res) => {
     db.all("SELECT * FROM cargo ORDER BY updated_at DESC", [], (err, rows) => {
         if (err) {
@@ -221,7 +236,7 @@ app.get('/api/admin/records', (req, res) => {
     });
 });
 
-// 📌 6. Stripe Checkout Session (100% Server-Verified Amount Security)
+// 📌 6. Stripe Checkout Session (Updated 4.2% Processing Fee & Customer Transparency)
 app.post('/create-checkout-session', (req, res) => {
     const { trackingNumber, customerName, customerEmail, customAmount } = req.body;
 
@@ -242,8 +257,9 @@ app.post('/create-checkout-session', (req, res) => {
             return res.status(400).json({ error: 'Valid invoice amount not found.' });
         }
 
-        // 3.5% Fee Server Calculation
-        const cardFee = Math.round(baseAmount * 0.035);
+        // 💳 Server-Side 4.2% Processing Fee & Tax Calculation
+        const cardFeeRate = 0.042; // 4.2% Fee
+        const cardFee = Math.round(baseAmount * cardFeeRate);
         const totalAmount = baseAmount + cardFee;
 
         try {
@@ -255,7 +271,7 @@ app.post('/create-checkout-session', (req, res) => {
                             currency: 'jpy',
                             product_data: {
                                 name: `Otek Export Freight Payment - ${trackingNumber.trim()}`,
-                                description: `Base Amount: ¥${baseAmount.toLocaleString()} JPY + 3.5% Card Processing Fee Included`,
+                                description: `Freight Amount: ¥${baseAmount.toLocaleString()} JPY | Card Processing & Service Fee (4.2%): ¥${cardFee.toLocaleString()} JPY`,
                             },
                             unit_amount: totalAmount,
                         },
@@ -281,5 +297,5 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`Server running securely on port ${PORT}`);
+    console.log(`Patched & Secure Server running on port ${PORT} with 4.2% Card Processing Fee`);
 });
