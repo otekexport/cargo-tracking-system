@@ -499,7 +499,7 @@
                         <strong id="dispBase">¥0</strong>
                     </div>
                     <div style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:13px; color:#0369a1;">
-                        <span>Card Fee 3.5% (කාඩ්පත් ගාස්තුව):</span>
+                        <span>Card Fee 4.2% (කාඩ්පත් ගාස්තුව):</span>
                         <strong id="dispFee">¥0</strong>
                     </div>
                     <div style="display:flex; justify-content:space-between; padding-top:6px; border-top:1px dashed #7dd3fc; font-size:15px; color:#0c4a6e; font-weight:bold;">
@@ -509,9 +509,9 @@
                 </div>
 
                 <div class="trilingual-notice">
-                    <div>📌 <strong>English:</strong> Note: A 3.5% card processing fee is included in the total payment amount.</div>
-                    <div>📌 <strong>සිංහල:</strong> සටහන: මෙම මුළු මුදලට 3.5% ක කාඩ්පත් සේවා ගාස්තුවක් ඇතුළත් කර ඇත.</div>
-                    <div>📌 <strong>தமிழ்:</strong> குறிப்பு: இந்த மொத்தத் தொகையில் 3.5% கார்டு செயலாக்கக் கட்டணம் சேர்க்கப்பட்டுள்ளது.</div>
+                    <div>📌 <strong>English:</strong> Note: A 4.2% card processing fee is included in the total payment amount.</div>
+                    <div>📌 <strong>සිංහල:</strong> සටහන: මෙම මුළු මුදලට 4.2% ක කාඩ්පත් සේවා ගාස්තුවක් ඇතුළත් කර ඇත.</div>
+                    <div>📌 <strong>தமிழ்:</strong> குறிப்பு: இந்த மொத்தத் தொகையில் 4.2% கார்டு செயலாக்கக் கட்டணம் சேர்க்கப்பட்டுள்ளது.</div>
                 </div>
 
                 <button class="stripe-pay-btn" style="width: 100%; border-radius: 8px; margin-top: 10px; font-size: 16px; padding: 14px;" onclick="makeDirectPayment()">
@@ -631,7 +631,7 @@
             const val = parseFloat(document.getElementById('customAmount').value) || 0;
             const box = document.getElementById('directCalcBox');
             if (val > 0) {
-                const fee = Math.round(val * 0.035);
+                const fee = Math.round(val * 0.042);
                 const total = val + fee;
                 document.getElementById('dispBase').innerText = '¥ ' + val.toLocaleString();
                 document.getElementById('dispFee').innerText = '¥ ' + fee.toLocaleString();
@@ -770,7 +770,7 @@
             if(data.success) {
                 const activeStep = getActiveStep(data.data.status, data.data.arrival_date);
                 const baseAmount = data.data.amount || 0;
-                const cardFee = Math.round(baseAmount * 0.035);
+                const cardFee = Math.round(baseAmount * 0.042);
                 const totalAmount = baseAmount + cardFee;
 
                 const steps = [
@@ -820,6 +820,23 @@
 
                     ${timelineHtml}
 
+                    <!-- ℹ️ Multi-Language Shipping Schedule Disclaimer Box -->
+                    <div style="background-color: #f8f9fa; border-left: 4px solid #0284c7; border-radius: 8px; padding: 15px; margin-top: 20px; font-size: 13px; color: #334155; line-height: 1.6; text-align: left;">
+                        <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; color: #0369a1; margin-bottom: 8px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                            <span>Important Shipping Notice / වැදගත් දැනුම්දීමයි / முக்கிய அறிவிப்பு</span>
+                        </div>
+                        <p style="margin: 0 0 8px 0;">
+                            <strong>English:</strong> Please note that arrival dates and shipment schedules are updated based on real-time data provided by shipping lines. Due to maritime weather conditions, port operations, and global logistics factors, estimated schedules may be subject to minor changes.
+                        </p>
+                        <p style="margin: 0 0 8px 0;">
+                            <strong>සිංහල:</strong> මෙහි දැක්වෙන නාවික හා ප්‍රවාහන තොරතුරු නැව් සමාගම් (Shipping Lines) මඟින් ලබාදෙන දත්ත මත නිතර යාවත්කාලීන වේ. මුහුදු මාර්ගයේ පවතින කාලගුණික තත්ත්වයන්, වරාය මෙහෙයුම් සහ ගෝලීය නාවික ප්‍රවාහන සාධක මත භාණ්ඩ පැමිණෙන දිනයන් යම් තාක් දුරකට වෙනස් විය හැකි බව කරුණාවෙන් සලකන්න.
+                        </p>
+                        <p style="margin: 0;">
+                            <strong>தமிழ்:</strong> இங்கு குறிப்பிடப்பட்டுள்ள கப்பல் வருகை தேதிகள் மற்றும் விவரங்கள் கப்பல் நிறுவனங்களால் (Shipping Lines) வழங்கப்படும் தகவல்களின் அடிப்படையில் புதுப்பிக்கப்படுகின்றன. கடல் வானிலை, துறைமுக நடவடிக்கைகள் மற்றும் உலகளாவிய தளவாடக் காரணிகள் காரணமாக, மதிப்பிடப்பட்ட வருகை தேதிகளில் சிறிய மாற்றங்கள் ஏற்படக்கூடும் என்பதை கவனத்தில் கொள்ளவும்.
+                        </p>
+                    </div>
+
                     <div style="margin-top:20px; padding:18px; background:#f5f3ff; border:1px solid #ddd6fe; border-radius:12px; text-align:center;">
                         <h4 style="margin:0 0 8px 0; color:#5b21b6;">💳 Online Card Payment (Stripe)</h4>
                         
@@ -829,7 +846,7 @@
                                 <strong>¥${baseAmount.toLocaleString()}</strong>
                             </div>
                             <div style="display:flex; justify-content:space-between; margin-bottom:4px; color:#6b21a8;">
-                                <span>Card Processing Fee (3.5%):</span>
+                                <span>Card Processing Fee (4.2%):</span>
                                 <strong>¥${cardFee.toLocaleString()}</strong>
                             </div>
                             <div style="display:flex; justify-content:space-between; padding-top:4px; border-top:1px dashed #ddd6fe; font-size:14px; color:#5b21b6; font-weight:bold;">
@@ -839,9 +856,9 @@
                         </div>
 
                         <div class="trilingual-notice">
-                            <div>📌 <strong>English:</strong> Note: A 3.5% card processing fee is included in the total payment amount.</div>
-                            <div>📌 <strong>සිංහල:</strong> සටහන: මෙම මුළු මුදලට 3.5% ක කාඩ්පත් සේවා ගාස්තුවක් ඇතුළත් කර ඇත.</div>
-                            <div>📌 <strong>தமிழ்:</strong> குறிப்பு: இந்த மொத்தத் தொகையில் 3.5% கார்டு செயலாக்கக் கட்டணம் சேர்க்கப்பட்டுள்ளது.</div>
+                            <div>📌 <strong>English:</strong> Note: A 4.2% card processing fee is included in the total payment amount.</div>
+                            <div>📌 <strong>සිංහල:</strong> සටහන: මෙම මුළු මුදලට 4.2% ක කාඩ්පත් සේවා ගාස්තුවක් ඇතුළත් කර ඇත.</div>
+                            <div>📌 <strong>தமிழ்:</strong> குறிப்பு: இந்த மொத்தத் தொகையில் 4.2% கார்டு செயலாக்கக் கட்டணம் சேர்க்கப்பட்டுள்ளது.</div>
                         </div>
 
                         <button class="stripe-pay-btn" style="margin-top:8px;" onclick="goToPaymentPage('${data.data.invoice_number}', '${data.data.customer_name}', ${baseAmount})">
