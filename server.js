@@ -4,6 +4,7 @@ const path = require('path');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const cors = require('cors');
+const PDFDocument = require('pdfkit');
 require('dotenv').config();
 
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
@@ -12,12 +13,12 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
-// 🛡️ 1. Proxy Trust Configuration (For Render / Cloudflare Real IP Protection)
+// 🛡️ Proxy Trust Configuration (Render / Cloudflare IP Protection)
 app.set('trust proxy', 1);
 
-// 🛡️ 2. Security Middleware Headers (Helmet + HSTS)
+// 🛡️ Security Headers
 app.use(helmet({
-    contentSecurityPolicy: false, // Stripe JS SDK සහ PWA සහය සඳහා
+    contentSecurityPolicy: false,
     strictTransportSecurity: {
         maxAge: 31536000,
         includeSubDomains: true,
@@ -27,22 +28,22 @@ app.use(helmet({
 
 app.use(cors());
 
-// 🛡️ 3. Request Payload Size Limits (DoS & Buffer Overflow Protection)
+// 🛡️ Request Payload Size Limits
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
-// 🛡️ 4. Rate Limiting: General Public API Endpoints
+// 🛡️ Rate Limiting: General Public API
 const generalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // මිනිත්තු 15යි
+    windowMs: 15 * 60 * 1000,
     max: 100,
     standardHeaders: true,
     legacyHeaders: false,
     message: { success: false, message: 'Too many requests from this IP. Please try again after 15 minutes.' }
 });
 
-// 🛡️ 5. Rate Limiting: Admin Brute-Force Protection
+// 🛡️ Rate Limiting: Admin Brute-Force Protection
 const adminLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // මිනිත්තු 15යි
+    windowMs: 15 * 60 * 1000,
     max: 10,
     standardHeaders: true,
     legacyHeaders: false,
@@ -52,7 +53,7 @@ const adminLimiter = rateLimit({
 app.use('/api/', generalLimiter);
 app.use('/api/admin/', adminLimiter);
 
-// Public Static File Serving
+// Serve Static Files
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Database Connection
@@ -236,7 +237,7 @@ app.get('/api/admin/records', (req, res) => {
     });
 });
 
-// 📌 6. Stripe Checkout Session (Updated 4.2% Processing Fee & Customer Transparency)
+// 📌 6. Stripe Checkout Session (4.2% Processing Fee Included)
 app.post('/create-checkout-session', (req, res) => {
     const { trackingNumber, customerName, customerEmail, customAmount } = req.body;
 
@@ -258,7 +259,7 @@ app.post('/create-checkout-session', (req, res) => {
         }
 
         // 💳 Server-Side 4.2% Processing Fee & Tax Calculation
-        const cardFeeRate = 0.042; // 4.2% Fee
+        const cardFeeRate = 0.042;
         const cardFee = Math.round(baseAmount * cardFeeRate);
         const totalAmount = baseAmount + cardFee;
 
@@ -292,10 +293,77 @@ app.post('/create-checkout-session', (req, res) => {
     });
 });
 
+// 📌 7. PDF Receipt Generator Endpoint
+app.get('/api/download-receipt/:invoice', (req, res) => {
+    const invoice = req.params.invoice ? req.params.invoice.trim() : '';
+    if (!invoice) {
+        return res.status(400).send('Invoice number is required.');
+    }
+
+    db.get("SELECT * FROM cargo WHERE invoice_number = ?", [invoice], (err, row) => {
+        if (err || !row) {
+            return res.status(404).send('Invoice record not found.');
+        }
+
+        const baseAmount = parseFloat(row.amount) || 0;
+        const cardFee = Math.round(baseAmount * 0.042);
+        const totalAmount = baseAmount + cardFee;
+
+        const doc = new PDFDocument({ size: 'A4', margin: 50 });
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename=Otek_Receipt_${invoice}.pdf`);
+
+        doc.pipe(res);
+
+        // Header / Branding
+        doc.fillColor('#0284c7').fontSize(22).text('OTEK EXPORT', { align: 'center', bold: true });
+        doc.fillColor('#475569').fontSize(10).text('Panorama Cargo Logistics (Pvt) Ltd', { align: 'center' });
+        doc.moveDown(0.5);
+        doc.fillColor('#0f172a').fontSize(14).text('OFFICIAL FREIGHT INVOICE & RECEIPT', { align: 'center', underline: true });
+        doc.moveDown(1);
+
+        doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor('#cbd5e1').stroke();
+        doc.moveDown(1);
+
+        // Shipment Details
+        doc.fontSize(11).fillColor('#334155');
+        doc.text(`Receipt Date: ${new Date().toLocaleDateString()}`);
+        doc.text(`Invoice / Tracking No: ${row.invoice_number}`);
+        doc.text(`Customer Name: ${row.customer_name || 'N/A'}`);
+        doc.text(`Destination: ${row.destination || 'N/A'}`);
+        doc.text(`Clearing Warehouse: ${row.clearing_warehouse || 'N/A'}`);
+        doc.text(`Arrival Date: ${row.arrival_date || 'N/A'}`);
+        doc.text(`Status: ${row.status || 'Pending'}`);
+        doc.moveDown(1.5);
+
+        // Payment Details Breakdown
+        doc.fillColor('#0369a1').fontSize(12).text('PAYMENT DETAILS BREAKDOWN', { bold: true });
+        doc.moveDown(0.5);
+
+        doc.fontSize(11).fillColor('#0f172a');
+        doc.text(`Base Freight Charge: ¥ ${baseAmount.toLocaleString()} JPY`);
+        doc.text(`Card Processing & Service Fee (4.2%): ¥ ${cardFee.toLocaleString()} JPY`);
+        
+        doc.moveDown(0.5);
+        doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor('#0284c7').stroke();
+        doc.moveDown(0.5);
+
+        doc.fontSize(13).fillColor('#15803d').text(`Total Amount Paid / Payable: ¥ ${totalAmount.toLocaleString()} JPY`, { bold: true });
+
+        doc.moveDown(3);
+        doc.fontSize(8).fillColor('#64748b').text('Notice: Arrival dates and schedules are updated based on real-time data provided by shipping lines and may be subject to minor changes due to weather and port operations.', { align: 'center' });
+        doc.moveDown(0.5);
+        doc.text('Thank you for choosing Otek Export & Panorama Cargo Logistics!', { align: 'center', bold: true });
+
+        doc.end();
+    });
+});
+
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.listen(PORT, () => {
-    console.log(`Patched & Secure Server running on port ${PORT} with 4.2% Card Processing Fee`);
+    console.log(`Server running securely on port ${PORT} with 4.2% Card Fee & PDF Receipt Engine`);
 });
