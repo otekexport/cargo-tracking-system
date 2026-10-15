@@ -5,6 +5,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const cors = require('cors');
 const PDFDocument = require('pdfkit');
+const cron = require('node-cron');
 require('dotenv').config();
 
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
@@ -12,8 +13,9 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1iWvwlNWxX9LV5AssmlMw-wYeF09ILncXamjulrdihDQ/export?format=csv';
 
-// 🛡️ Proxy Trust Configuration (Render / Cloudflare IP Protection)
+// 🛡️ Proxy Trust Configuration
 app.set('trust proxy', 1);
 
 // 🛡️ Security Headers
@@ -28,11 +30,11 @@ app.use(helmet({
 
 app.use(cors());
 
-// 🛡️ Request Payload Size Limits
+// 🛡️ Request Limits
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
-// 🛡️ Rate Limiting: General Public API
+// 🛡️ Rate Limiting
 const generalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 100,
@@ -41,7 +43,6 @@ const generalLimiter = rateLimit({
     message: { success: false, message: 'Too many requests from this IP. Please try again after 15 minutes.' }
 });
 
-// 🛡️ Rate Limiting: Admin Brute-Force Protection
 const adminLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 10,
@@ -53,7 +54,7 @@ const adminLimiter = rateLimit({
 app.use('/api/', generalLimiter);
 app.use('/api/admin/', adminLimiter);
 
-// Serve Static Files
+// Static Files
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Database Connection
@@ -65,18 +66,21 @@ const db = new sqlite3.Database('./cargo.db', (err) => {
     }
 });
 
-// Database Table Schema Setup
+// Database Table Schema Setup with Shipping Date & Phone
 db.serialize(() => {
     db.run(`
         CREATE TABLE IF NOT EXISTS cargo (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             invoice_number TEXT UNIQUE NOT NULL,
             customer_name TEXT,
+            customer_phone TEXT,
+            shipping_date TEXT,
             arrival_date TEXT,
             clearing_warehouse TEXT,
             amount REAL DEFAULT 0,
             status TEXT,
             destination TEXT,
+            whatsapp_sent INTEGER DEFAULT 0,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
@@ -88,6 +92,162 @@ function checkAdminAuth(reqPassword) {
     if (!ADMIN_PASSWORD) return false;
     return reqPassword === ADMIN_PASSWORD;
 }
+
+// 📲 Helper: Send WhatsApp Alert via UltraMsg API
+async function sendWhatsAppAlert(customerPhone, customerName, invoiceNumber, status, arrivalDate) {
+    if (!customerPhone) return;
+
+    const cleanPhone = customerPhone.replace(/[^0-9]/g, '');
+    if (cleanPhone.length < 9) return;
+
+    const instanceId = process.env.ULTRAMSG_INSTANCE_ID;
+    const token = process.env.ULTRAMSG_TOKEN;
+
+    if (!instanceId || !token) {
+        console.log("UltraMsg API credentials missing in environment variables.");
+        return;
+    }
+
+    const messageText = `Hello ${customerName || 'Valued Customer'},\n\n` +
+        `📦 *Cargo Shipment Arrival Notice*\n` +
+        `• Invoice No: *${invoiceNumber}*\n` +
+        `• Status: *${status || 'Arriving Today'}*\n` +
+        `• Arrival Date: *${arrivalDate || 'Today'}*\n\n` +
+        `🔗 Track live status at: https://tracking.otekexport.org\n\n` +
+        `Thank you for choosing Otek Export & Panorama Cargo Logistics!`;
+
+    try {
+        const response = await fetch(`https://api.ultramsg.com/${instanceId}/messages/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                token: token,
+                to: cleanPhone,
+                body: messageText
+            })
+        });
+
+        const data = await response.json();
+        console.log(`WhatsApp Alert sent successfully to ${cleanPhone}:`, data);
+    } catch (err) {
+        console.error("WhatsApp API Send Error:", err.message);
+    }
+}
+
+// 📊 Helper: Parse CSV Matrix
+function parseCSVMatrix(text) {
+    const lines = text.split(/\r?\n/);
+    return lines.map(line => {
+        const row = [];
+        let insideQuote = false;
+        let entry = '';
+        for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            if (char === '"') {
+                insideQuote = !insideQuote;
+            } else if (char === ',' && !insideQuote) {
+                row.push(entry.trim());
+                entry = '';
+            } else {
+                entry += char;
+            }
+        }
+        row.push(entry.trim());
+        return row;
+    });
+}
+
+// 🔄 Core Engine: Fetch & Sync Data from Google Sheet
+async function syncGoogleSheetData() {
+    console.log('🔄 Syncing Google Sheet Data...');
+    try {
+        const response = await fetch(GOOGLE_SHEET_CSV_URL);
+        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+        
+        const csvText = await response.text();
+        const rows = parseCSVMatrix(csvText);
+
+        if (rows.length < 4) {
+            console.log('Sheet format invalid: Expected at least 4 rows.');
+            return { success: false, message: 'Invalid sheet format.' };
+        }
+
+        const maxCols = Math.max(...rows.map(r => r.length));
+        let totalCount = 0;
+
+        const query = `
+            INSERT INTO cargo (invoice_number, shipping_date, arrival_date, updated_at)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(invoice_number) DO UPDATE SET
+                shipping_date = CASE WHEN excluded.shipping_date != '' THEN excluded.shipping_date ELSE cargo.shipping_date END,
+                arrival_date = CASE WHEN excluded.arrival_date != '' THEN excluded.arrival_date ELSE cargo.arrival_date END,
+                updated_at = CURRENT_TIMESTAMP
+        `;
+
+        db.serialize(() => {
+            db.run("BEGIN TRANSACTION");
+            const stmt = db.prepare(query);
+
+            for (let col = 0; col < maxCols; col++) {
+                // Row 0: Container No (Skipped)
+                // Row 1: Comments (Skipped)
+                // Row 2: Shipping Date
+                // Row 3: Arrival Date / ETA
+                const shipDate = (rows[2] && rows[2][col]) ? rows[2][col].trim() : '';
+                const arrDate = (rows[3] && rows[3][col]) ? rows[3][col].trim() : '';
+
+                // Row 4 onwards: Invoice Numbers
+                for (let r = 4; r < rows.length; r++) {
+                    const inv = (rows[r] && rows[r][col]) ? rows[r][col].trim() : '';
+                    if (inv && inv !== '' && inv.length >= 2) {
+                        stmt.run([inv, shipDate, arrDate]);
+                        totalCount++;
+                    }
+                }
+            }
+
+            stmt.finalize();
+            db.run("COMMIT", (err) => {
+                if (err) console.error("Error committing Google Sheet transaction:", err);
+                else console.log(`✅ Google Sheet Sync Completed! ${totalCount} records processed.`);
+            });
+        });
+
+        return { success: true, count: totalCount };
+    } catch (err) {
+        console.error("Google Sheet Sync Failed:", err.message);
+        return { success: false, error: err.message };
+    }
+}
+
+// ⏰ Hourly Cron Job: Auto-Sync Google Sheet
+cron.schedule('0 * * * *', () => {
+    syncGoogleSheetData();
+});
+
+// ⏰ Daily Cron Job: Send Arrival WhatsApp Alerts at 09:00 AM
+cron.schedule('0 9 * * *', () => {
+    console.log('⏰ Running daily WhatsApp arrival check...');
+    const today = new Date();
+    const isoToday = today.toISOString().split('T')[0];
+    const formattedToday = today.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+    const query = `
+        SELECT * FROM cargo 
+        WHERE (arrival_date LIKE ? OR arrival_date LIKE ? OR arrival_date = ?) 
+        AND (whatsapp_sent = 0 OR whatsapp_sent IS NULL)
+    `;
+
+    db.all(query, [`%${isoToday}%`, `%${formattedToday}%`, isoToday], (err, rows) => {
+        if (err || !rows) return;
+        rows.forEach((row) => {
+            if (row.customer_phone) {
+                sendWhatsAppAlert(row.customer_phone, row.customer_name, row.invoice_number, 'Arriving Today at Port ⚓', row.arrival_date);
+                db.run("UPDATE cargo SET whatsapp_sent = 1 WHERE id = ?", [row.id]);
+            }
+        });
+    });
+});
 
 // 📌 1. Track Cargo Endpoint
 app.get('/api/track/:invoice', (req, res) => {
@@ -108,9 +268,24 @@ app.get('/api/track/:invoice', (req, res) => {
     });
 });
 
-// 📌 2. Admin Update Endpoint
+// 📌 2. Admin Manual Sync Google Sheet Endpoint
+app.post('/api/admin/sync-sheet', async (req, res) => {
+    const { admin_password } = req.body;
+    if (!checkAdminAuth(admin_password)) {
+        return res.status(401).json({ success: false, message: 'Invalid Admin Password!' });
+    }
+
+    const result = await syncGoogleSheetData();
+    if (result.success) {
+        res.json({ success: true, message: `Google Sheet Sync Successful! Processed ${result.count} records.` });
+    } else {
+        res.status(500).json({ success: false, message: `Sync Failed: ${result.error || result.message}` });
+    }
+});
+
+// 📌 3. Admin Single Update Endpoint
 app.post('/api/admin/update', (req, res) => {
-    const { admin_password, invoice_number, customer_name, arrival_date, clearing_warehouse, amount, status, destination } = req.body;
+    const { admin_password, invoice_number, customer_name, customer_phone, shipping_date, arrival_date, clearing_warehouse, amount, status, destination } = req.body;
 
     if (!checkAdminAuth(admin_password)) {
         return res.status(401).json({ success: false, message: 'Invalid Admin Password!' });
@@ -124,28 +299,36 @@ app.post('/api/admin/update', (req, res) => {
     const cleanAmount = parseFloat(amount) || 0;
 
     const query = `
-        INSERT INTO cargo (invoice_number, customer_name, arrival_date, clearing_warehouse, amount, status, destination, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        INSERT INTO cargo (invoice_number, customer_name, customer_phone, shipping_date, arrival_date, clearing_warehouse, amount, status, destination, whatsapp_sent, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP)
         ON CONFLICT(invoice_number) DO UPDATE SET
             customer_name = excluded.customer_name,
+            customer_phone = excluded.customer_phone,
+            shipping_date = excluded.shipping_date,
             arrival_date = excluded.arrival_date,
             clearing_warehouse = excluded.clearing_warehouse,
             amount = excluded.amount,
             status = excluded.status,
             destination = excluded.destination,
+            whatsapp_sent = 0,
             updated_at = CURRENT_TIMESTAMP
     `;
 
-    db.run(query, [cleanInvoice, customer_name, arrival_date, clearing_warehouse, cleanAmount, status, destination], function(err) {
+    db.run(query, [cleanInvoice, customer_name, customer_phone, shipping_date, arrival_date, clearing_warehouse, cleanAmount, status, destination], function(err) {
         if (err) {
             console.error(err);
             return res.status(500).json({ success: false, message: 'Failed to update record.' });
         }
+
+        if (customer_phone) {
+            sendWhatsAppAlert(customer_phone, customer_name, cleanInvoice, status, arrival_date);
+        }
+
         res.json({ success: true, message: `Record for ${cleanInvoice} updated successfully!` });
     });
 });
 
-// 📌 3. Admin Delete Endpoint
+// 📌 4. Admin Delete Endpoint
 app.post('/api/admin/delete', (req, res) => {
     const { admin_password, invoice_number } = req.body;
 
@@ -169,7 +352,7 @@ app.post('/api/admin/delete', (req, res) => {
     });
 });
 
-// 📌 4. Admin Bulk Update Endpoint
+// 📌 5. Admin Bulk Update Endpoint (CSV Upload)
 app.post('/api/admin/bulk-update', (req, res) => {
     const { admin_password, shipments } = req.body;
 
@@ -182,8 +365,8 @@ app.post('/api/admin/bulk-update', (req, res) => {
     }
 
     const query = `
-        INSERT INTO cargo (arrival_date, clearing_warehouse, invoice_number, customer_name, status, destination, amount, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        INSERT INTO cargo (arrival_date, clearing_warehouse, invoice_number, customer_name, status, destination, amount, customer_phone, shipping_date, whatsapp_sent, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP)
         ON CONFLICT(invoice_number) DO UPDATE SET
             arrival_date = excluded.arrival_date,
             clearing_warehouse = excluded.clearing_warehouse,
@@ -191,6 +374,9 @@ app.post('/api/admin/bulk-update', (req, res) => {
             status = excluded.status,
             destination = excluded.destination,
             amount = excluded.amount,
+            customer_phone = excluded.customer_phone,
+            shipping_date = excluded.shipping_date,
+            whatsapp_sent = 0,
             updated_at = CURRENT_TIMESTAMP
     `;
 
@@ -209,7 +395,9 @@ app.post('/api/admin/bulk-update', (req, res) => {
                     item.customer_name || '',
                     item.status || '',
                     item.destination || '',
-                    amt
+                    amt,
+                    item.customer_phone || '',
+                    item.shipping_date || ''
                 ]);
                 updatedCount++;
             }
@@ -226,7 +414,7 @@ app.post('/api/admin/bulk-update', (req, res) => {
     });
 });
 
-// 📌 5. Admin Records Fetch Endpoint
+// 📌 6. Admin Records Fetch Endpoint
 app.get('/api/admin/records', (req, res) => {
     db.all("SELECT * FROM cargo ORDER BY updated_at DESC", [], (err, rows) => {
         if (err) {
@@ -237,7 +425,7 @@ app.get('/api/admin/records', (req, res) => {
     });
 });
 
-// 📌 6. Stripe Checkout Session (4.2% Processing Fee Included)
+// 📌 7. Stripe Checkout Session
 app.post('/create-checkout-session', (req, res) => {
     const { trackingNumber, customerName, customerEmail, customAmount } = req.body;
 
@@ -258,7 +446,6 @@ app.post('/create-checkout-session', (req, res) => {
             return res.status(400).json({ error: 'Valid invoice amount not found.' });
         }
 
-        // 💳 Server-Side 4.2% Processing Fee & Tax Calculation
         const cardFeeRate = 0.042;
         const cardFee = Math.round(baseAmount * cardFeeRate);
         const totalAmount = baseAmount + cardFee;
@@ -293,7 +480,7 @@ app.post('/create-checkout-session', (req, res) => {
     });
 });
 
-// 📌 7. PDF Receipt Generator Endpoint
+// 📌 8. PDF Receipt Generator Endpoint
 app.get('/api/download-receipt/:invoice', (req, res) => {
     const invoice = req.params.invoice ? req.params.invoice.trim() : '';
     if (!invoice) {
@@ -331,9 +518,11 @@ app.get('/api/download-receipt/:invoice', (req, res) => {
         doc.text(`Receipt Date: ${new Date().toLocaleDateString()}`);
         doc.text(`Invoice / Tracking No: ${row.invoice_number}`);
         doc.text(`Customer Name: ${row.customer_name || 'N/A'}`);
+        doc.text(`Customer Phone: ${row.customer_phone || 'N/A'}`);
         doc.text(`Destination: ${row.destination || 'N/A'}`);
         doc.text(`Clearing Warehouse: ${row.clearing_warehouse || 'N/A'}`);
-        doc.text(`Arrival Date: ${row.arrival_date || 'N/A'}`);
+        doc.text(`Shipping Date: ${row.shipping_date || 'N/A'}`);
+        doc.text(`Arrival Date (ETA): ${row.arrival_date || 'N/A'}`);
         doc.text(`Status: ${row.status || 'Pending'}`);
         doc.moveDown(1.5);
 
@@ -365,5 +554,7 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`Server running securely on port ${PORT} with 4.2% Card Fee & PDF Receipt Engine`);
+    console.log(`Server running securely on port ${PORT} with Auto Google Sheet Reader`);
+    // Run an initial sync on server start
+    syncGoogleSheetData();
 });
