@@ -24,16 +24,15 @@ const WAREHOUSE_MAP = {
     'SER': 'Ceylon Logistics Worldwide (Pvt) Ltd'
 };
 
-// Helper: Extract Warehouse Full Name from Arrival Date / ETA String
-function extractWarehouseName(arrDateStr) {
-    if (!arrDateStr) return '';
-    const upper = arrDateStr.toUpperCase();
+// Helper: Extract Warehouse Full Name from Any Field (Shipping Date, Arrival Date, Warehouse)
+function extractWarehouseName(shipDateStr, arrDateStr, warehouseStr) {
+    const combined = ((shipDateStr || '') + ' ' + (arrDateStr || '') + ' ' + (warehouseStr || '')).toUpperCase();
     for (const [code, fullName] of Object.entries(WAREHOUSE_MAP)) {
-        if (upper.includes(code)) {
+        if (combined.includes(code)) {
             return fullName;
         }
     }
-    return '';
+    return warehouseStr || '';
 }
 
 // 🛡️ Proxy Trust Configuration
@@ -213,13 +212,13 @@ async function syncGoogleSheetData() {
             for (let col = 0; col < maxCols; col++) {
                 // Row 0: Container No (Skipped)
                 // Row 1: Comments (Skipped)
-                // Row 2: Shipping Date
-                // Row 3: Arrival Date / ETA (Includes Warehouse Code e.g. "2026/08/27 LAK")
+                // Row 2: Shipping Date (e.g. "2026/08/20 SER")
+                // Row 3: Arrival Date / ETA (e.g. "ETA 2026/09/29")
                 const shipDate = (rows[2] && rows[2][col]) ? rows[2][col].trim() : '';
                 const rawArrDate = (rows[3] && rows[3][col]) ? rows[3][col].trim() : '';
 
-                // Extract Warehouse Name from Code (e.g. LAK -> Laksiri Warehouse in Peliyagoda)
-                const warehouseName = extractWarehouseName(rawArrDate);
+                // Extract Warehouse Name from Code
+                const warehouseName = extractWarehouseName(shipDate, rawArrDate, '');
 
                 // Row 4 onwards: Invoice Numbers
                 for (let r = 4; r < rows.length; r++) {
@@ -274,7 +273,7 @@ cron.schedule('0 9 * * *', () => {
     });
 });
 
-// 📌 1. Track Cargo Endpoint
+// 📌 1. Track Cargo Endpoint (With On-the-Fly Warehouse Detection)
 app.get('/api/track/:invoice', (req, res) => {
     const invoice = req.params.invoice ? req.params.invoice.trim() : '';
     if (!invoice) {
@@ -289,6 +288,13 @@ app.get('/api/track/:invoice', (req, res) => {
         if (!row) {
             return res.status(404).json({ success: false, message: 'Invoice number not found. Please double check.' });
         }
+
+        // 💡 Dynamic Warehouse Resolution: On-the-fly detection
+        const resolvedWarehouse = extractWarehouseName(row.shipping_date, row.arrival_date, row.clearing_warehouse);
+        if (resolvedWarehouse) {
+            row.clearing_warehouse = resolvedWarehouse;
+        }
+
         res.json({ success: true, data: row });
     });
 });
@@ -521,6 +527,8 @@ app.get('/api/download-receipt/:invoice', (req, res) => {
         const cardFee = Math.round(baseAmount * 0.042);
         const totalAmount = baseAmount + cardFee;
 
+        const resolvedWarehouse = extractWarehouseName(row.shipping_date, row.arrival_date, row.clearing_warehouse) || row.clearing_warehouse || 'N/A';
+
         const doc = new PDFDocument({ size: 'A4', margin: 50 });
 
         res.setHeader('Content-Type', 'application/pdf');
@@ -545,7 +553,7 @@ app.get('/api/download-receipt/:invoice', (req, res) => {
         doc.text(`Customer Name: ${row.customer_name || 'N/A'}`);
         doc.text(`Customer Phone: ${row.customer_phone || 'N/A'}`);
         doc.text(`Destination: ${row.destination || 'N/A'}`);
-        doc.text(`Clearing Warehouse: ${row.clearing_warehouse || 'N/A'}`);
+        doc.text(`Clearing Warehouse: ${resolvedWarehouse}`);
         doc.text(`Shipping Date: ${row.shipping_date || 'N/A'}`);
         doc.text(`Arrival Date (ETA): ${row.arrival_date || 'N/A'}`);
         doc.text(`Status: ${row.status || 'Pending'}`);
@@ -579,6 +587,6 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`Server running securely on port ${PORT} with Auto Google Sheet Reader`);
+    console.log(`Server running securely on port ${PORT} with Dynamic Warehouse Resolution`);
     syncGoogleSheetData();
 });
