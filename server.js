@@ -15,6 +15,27 @@ const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1iWvwlNWxX9LV5AssmlMw-wYeF09ILncXamjulrdihDQ/export?format=csv';
 
+// 🏢 Warehouse Short Code to Full Name Mapping
+const WAREHOUSE_MAP = {
+    'LAK': 'Laksiri Warehouse in Peliyagoda',
+    'NNR': 'NNR Peliyagoda',
+    'CSL': 'CSL Cargo Warehouse',
+    'TRN': 'Transco Warehouse',
+    'SER': 'Ceylon Logistics Worldwide (Pvt) Ltd'
+};
+
+// Helper: Extract Warehouse Full Name from Arrival Date / ETA String
+function extractWarehouseName(arrDateStr) {
+    if (!arrDateStr) return '';
+    const upper = arrDateStr.toUpperCase();
+    for (const [code, fullName] of Object.entries(WAREHOUSE_MAP)) {
+        if (upper.includes(code)) {
+            return fullName;
+        }
+    }
+    return '';
+}
+
 // 🛡️ Proxy Trust Configuration
 app.set('trust proxy', 1);
 
@@ -66,7 +87,7 @@ const db = new sqlite3.Database('./cargo.db', (err) => {
     }
 });
 
-// Database Table Schema Setup with Shipping Date & Phone
+// Database Table Schema Setup
 db.serialize(() => {
     db.run(`
         CREATE TABLE IF NOT EXISTS cargo (
@@ -176,11 +197,12 @@ async function syncGoogleSheetData() {
         let totalCount = 0;
 
         const query = `
-            INSERT INTO cargo (invoice_number, shipping_date, arrival_date, updated_at)
-            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            INSERT INTO cargo (invoice_number, shipping_date, arrival_date, clearing_warehouse, updated_at)
+            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
             ON CONFLICT(invoice_number) DO UPDATE SET
                 shipping_date = CASE WHEN excluded.shipping_date != '' THEN excluded.shipping_date ELSE cargo.shipping_date END,
                 arrival_date = CASE WHEN excluded.arrival_date != '' THEN excluded.arrival_date ELSE cargo.arrival_date END,
+                clearing_warehouse = CASE WHEN excluded.clearing_warehouse != '' THEN excluded.clearing_warehouse ELSE cargo.clearing_warehouse END,
                 updated_at = CURRENT_TIMESTAMP
         `;
 
@@ -192,15 +214,18 @@ async function syncGoogleSheetData() {
                 // Row 0: Container No (Skipped)
                 // Row 1: Comments (Skipped)
                 // Row 2: Shipping Date
-                // Row 3: Arrival Date / ETA
+                // Row 3: Arrival Date / ETA (Includes Warehouse Code e.g. "2026/08/27 LAK")
                 const shipDate = (rows[2] && rows[2][col]) ? rows[2][col].trim() : '';
-                const arrDate = (rows[3] && rows[3][col]) ? rows[3][col].trim() : '';
+                const rawArrDate = (rows[3] && rows[3][col]) ? rows[3][col].trim() : '';
+
+                // Extract Warehouse Name from Code (e.g. LAK -> Laksiri Warehouse in Peliyagoda)
+                const warehouseName = extractWarehouseName(rawArrDate);
 
                 // Row 4 onwards: Invoice Numbers
                 for (let r = 4; r < rows.length; r++) {
                     const inv = (rows[r] && rows[r][col]) ? rows[r][col].trim() : '';
                     if (inv && inv !== '' && inv.length >= 2) {
-                        stmt.run([inv, shipDate, arrDate]);
+                        stmt.run([inv, shipDate, rawArrDate, warehouseName]);
                         totalCount++;
                     }
                 }
@@ -555,6 +580,5 @@ app.get('*', (req, res) => {
 
 app.listen(PORT, () => {
     console.log(`Server running securely on port ${PORT} with Auto Google Sheet Reader`);
-    // Run an initial sync on server start
     syncGoogleSheetData();
 });
