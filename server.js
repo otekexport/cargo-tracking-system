@@ -1,537 +1,413 @@
-const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const cors = require('cors');
-const PDFDocument = require('pdfkit');
-const cron = require('node-cron');
-require('dotenv').config();
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Otek Export Cargo System</title>
+    
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#05131f">
+    <script src="https://js.stripe.com/v3/"></script>
 
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-
-const app = express();
-const PORT = process.env.PORT || 3000;
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
-
-// 📊 Google Sheet URLs
-const GOOGLE_SHEET_SHIPPING_URL = 'https://docs.google.com/spreadsheets/d/1iWvwlNWxX9LV5AssmlMw-wYeF09ILncXamjulrdihDQ/export?format=csv';
-const GOOGLE_SHEET_CUSTOMER_URL = 'https://docs.google.com/spreadsheets/d/165g39MP4HHIrMulhqM3Ot8isCrp5FP_0ZwtX8Aafg-A/export?format=csv&gid=757565291';
-const GOOGLE_SHEET_AMOUNT_URL = 'https://docs.google.com/spreadsheets/d/104cDSC0HcAr1S8zJQZhRITIdqNuBj1RUH9L1CYHOtJg/export?format=csv';
-
-const WAREHOUSE_MAP = {
-    'LAK': 'Laksiri Warehouse in Peliyagoda',
-    'NNR': 'NNR Peliyagoda',
-    'CSL': 'CSL Cargo Warehouse',
-    'TRN': 'Transco Warehouse',
-    'SER': 'Ceylon Logistics Worldwide (Pvt) Ltd'
-};
-
-function extractWarehouseName(shipDateStr, arrDateStr, warehouseStr) {
-    const combined = ((shipDateStr || '') + ' ' + (arrDateStr || '') + ' ' + (warehouseStr || '')).toUpperCase();
-    for (const [code, fullName] of Object.entries(WAREHOUSE_MAP)) {
-        if (combined.includes(code)) {
-            return fullName;
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            background: linear-gradient(135deg, #05131f, #0b253a, #113856);
         }
-    }
-    return warehouseStr || '';
-}
 
-app.set('trust proxy', 1);
+        body { 
+            font-family: Arial, sans-serif; 
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 15px;
+            box-sizing: border-box;
+        }
 
-app.use(helmet({
-    contentSecurityPolicy: false,
-    strictTransportSecurity: {
-        maxAge: 31536000,
-        includeSubDomains: true,
-        preload: true
-    }
-}));
+        #starCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -1;
+            pointer-events: none;
+        }
 
-app.use(cors());
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+        .card { 
+            background: rgba(255, 255, 255, 0.96); 
+            backdrop-filter: blur(10px);
+            padding: 25px; 
+            border-radius: 16px; 
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5); 
+            width: 100%; 
+            max-width: 950px;
+            text-align: left; 
+            margin: 20px auto;
+            box-sizing: border-box;
+            border: 1px solid rgba(255, 215, 0, 0.2);
+        }
 
-const generalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { success: false, message: 'Too many requests from this IP. Please try again after 15 minutes.' }
-});
+        .nav-buttons { 
+            display: flex; 
+            justify-content: space-between; 
+            gap: 8px;
+            margin-bottom: 20px; 
+            border-bottom: 2px solid #eee; 
+            padding-bottom: 10px; 
+            flex-wrap: wrap;
+        }
+        .nav-btn { 
+            background: none; 
+            border: none; 
+            font-size: 14px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            color: #666; 
+            padding: 8px 12px; 
+            border-radius: 6px;
+            flex: 1;
+            text-align: center;
+        }
+        .nav-btn.active { 
+            color: #007bff; 
+            border-bottom: 3px solid #007bff; 
+            background: rgba(0, 123, 255, 0.05);
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        label { font-size: 13px; font-weight: bold; color: #333; display: block; margin-top: 12px; }
+        input[type="text"], input[type="password"], input[type="number"], input[type="email"], input[type="file"] { width: 100%; padding: 12px; margin: 6px 0 10px 0; font-size: 14px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; }
+        
+        button.submit-btn { width: 100%; padding: 12px; font-size: 16px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; margin-top: 10px; font-weight: bold; }
+        button.admin-btn { background: #007bff; }
+        button.sync-btn { background: #0284c7; }
+        button.bulk-btn { background: #6f42c1; }
+        button.delete-btn { background: #dc3545; }
+        button.view-page-btn { background: #17a2b8; }
+        button.stripe-pay-btn { background: #635bff; color: white; border: none; padding: 12px 24px; border-radius: 25px; font-weight: bold; cursor: pointer; font-size: 15px; }
+        .section-divider { border-top: 1px solid #ddd; margin: 25px 0; }
+        
+        #result { margin-top: 18px; font-size: 14px; line-height: 1.6; word-break: break-word; }
+        .result-box {
+            background: #f8f9fa;
+            border-left: 5px solid #28a745;
+            padding: 16px;
+            border-radius: 8px;
+            box-sizing: border-box;
+        }
+        .result-item { margin-bottom: 8px; color: #2c3e50; }
+        .brand-logo { max-width: 160px; height: auto; display: block; margin: 0 auto 15px auto; }
 
-const adminLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 10,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { success: false, message: 'Too many admin authorization attempts. Try again after 15 minutes.' }
-});
+        .app-download-banner {
+            background: linear-gradient(135deg, #FFD700, #ffa500);
+            color: #05131f;
+            padding: 14px 18px;
+            border-radius: 12px;
+            margin-top: 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            flex-wrap: wrap;
+            gap: 10px;
+            box-sizing: border-box;
+        }
+        .app-download-btn {
+            background: #05131f;
+            color: #FFD700;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
 
-app.use('/api/', generalLimiter);
-app.use('/api/admin/', adminLimiter);
-app.use(express.static(path.join(__dirname, 'public')));
+    <canvas id="starCanvas"></canvas>
 
-const db = new sqlite3.Database('./cargo.db', (err) => {
-    if (err) {
-        console.error('Database connection error:', err.message);
-    } else {
-        console.log('Connected securely to SQLite database.');
-    }
-});
+    <div class="card">
+        <div class="nav-buttons">
+            <button class="nav-btn active" id="btn-customer" onclick="switchTab('customer')">📦 Track Cargo</button>
+            <button class="nav-btn" id="btn-payment" onclick="switchTab('payment')">💳 Direct Payment</button>
+            <button class="nav-btn" id="btn-admin" onclick="switchTab('admin')">🛠️ Admin Panel</button>
+        </div>
 
-db.serialize(() => {
-    db.run(`
-        CREATE TABLE IF NOT EXISTS cargo (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            invoice_number TEXT UNIQUE NOT NULL,
-            customer_name TEXT,
-            customer_phone TEXT,
-            shipping_date TEXT,
-            arrival_date TEXT,
-            clearing_warehouse TEXT,
-            amount REAL DEFAULT 0,
-            full_price REAL DEFAULT 0,
-            status TEXT,
-            destination TEXT,
-            whatsapp_sent INTEGER DEFAULT 0,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    `);
-});
+        <div id="customer" class="tab-content active">
+            <img src="logo.png" alt="Logo" class="brand-logo" onerror="this.style.display='none'">
+            <h3 style="margin-top:0; color:#28a745; text-align: center;">Otek Export Customer Tracking</h3>
+            <label>Invoice Number:</label>
+            <input type="text" id="invoice" placeholder="e.g. 8694 or INV-1001" onkeypress="if(event.key === 'Enter') track()">
+            <button class="submit-btn" onclick="track()">Track Status</button>
+            <div id="result"></div>
+        </div>
 
-function checkAdminAuth(reqPassword) {
-    if (!ADMIN_PASSWORD) return false;
-    return reqPassword === ADMIN_PASSWORD;
-}
+        <div id="payment" class="tab-content">
+            <h3 style="color:#635bff; text-align: center;">💳 Direct Invoice Payment</h3>
+            <label>Customer Name:</label>
+            <input type="text" id="customName">
+            <label>Email Address:</label>
+            <input type="email" id="customEmail">
+            <label>Invoice Number:</label>
+            <input type="text" id="customInv">
+            <label>Amount JPY:</label>
+            <input type="number" id="customAmount">
+            <button class="stripe-pay-btn" style="width:100%; margin-top:10px;" onclick="makeDirectPayment()">💳 Pay Now</button>
+        </div>
 
-async function sendWhatsAppAlert(customerPhone, customerName, invoiceNumber, status, arrivalDate) {
-    if (!customerPhone) return;
+        <div id="admin" class="tab-content">
+            <h3 style="color:#007bff; text-align: center;">Admin Panel</h3>
+            <div id="adminUpdateForm" style="display: none;">
+                <h4 style="color: #17a2b8;">View & Sync Database</h4>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button class="submit-btn view-page-btn" style="flex:1;" onclick="window.open('/records.html', '_blank')">📂 Open Records</button>
+                    <button class="submit-btn sync-btn" style="flex:1;" onclick="syncGoogleSheetNow()">🔄 Sync Sheets</button>
+                </div>
+                <div id="syncMsg"></div>
 
-    const cleanPhone = customerPhone.replace(/[^0-9]/g, '');
-    if (cleanPhone.length < 9) return;
+                <div class="section-divider"></div>
+                <h4 style="margin: 0 0 5px 0;">Single Cargo Update</h4>
+                <label>Shipping Date:</label>
+                <input type="text" id="shippingDate">
+                <label>Arrival Date (ETA):</label>
+                <input type="text" id="arrivalDate">
+                <label>Clearing Warehouse:</label>
+                <input type="text" id="clearingWarehouse">
+                <label>Invoice Number:</label>
+                <input type="text" id="inv">
+                <label>Customer Name:</label>
+                <input type="text" id="name">
+                <label>Customer Phone:</label>
+                <input type="text" id="phone">
+                <label>Have to Pay Amount:</label>
+                <input type="number" id="chargeAmount">
+                <label>Full Price:</label>
+                <input type="number" id="fullPriceInput">
+                <label>Status:</label>
+                <input type="text" id="status">
+                <label>Destination:</label>
+                <input type="text" id="dest">
+                <button class="submit-btn admin-btn" onclick="updateShipment()">Save Status</button>
+                <div id="msg"></div>
 
-    const instanceId = process.env.ULTRAMSG_INSTANCE_ID;
-    const token = process.env.ULTRAMSG_TOKEN;
+                <div class="section-divider"></div>
+                <h4 style="color: #dc3545;">Delete Record</h4>
+                <label>Invoice to Delete:</label>
+                <input type="text" id="deleteInv">
+                <button class="submit-btn delete-btn" onclick="deleteShipment()">Delete</button>
+                <div id="deleteMsg"></div>
 
-    if (!instanceId || !token) return;
+                <div class="section-divider"></div>
+                <h4 style="color: #6f42c1;">Bulk CSV Upload</h4>
+                <input type="file" id="csvFile" accept=".csv">
+                <button class="submit-btn bulk-btn" onclick="uploadCSV()">Upload CSV</button>
+                <div id="bulkMsg"></div>
 
-    const messageText = `Hello ${customerName || 'Valued Customer'},\n\n` +
-        `📦 *Cargo Shipment Arrival Notice*\n` +
-        `• Invoice No: *${invoiceNumber}*\n` +
-        `• Status: *${status || 'Arriving Today'}*\n` +
-        `• Arrival Date: *${arrivalDate || 'Today'}*\n\n` +
-        `🔗 Track live status at: https://tracking.otekexport.org\n\n` +
-        `Thank you for choosing Otek Export & Panorama Cargo Logistics!`;
+                <div class="section-divider"></div>
+                <button style="background: #6c757d; color: white; border: none; padding: 10px; width: 100%; font-weight: bold; border-radius: 4px; cursor:pointer;" onclick="logoutAdmin()">Logout</button>
+            </div>
+        </div>
 
-    try {
-        await fetch(`https://api.ultramsg.com/${instanceId}/messages/chat`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({ token: token, to: cleanPhone, body: messageText })
-        });
-    } catch (err) {
-        console.error("WhatsApp API Error:", err.message);
-    }
-}
+        <div class="app-download-banner">
+            <span>📲 Get Otek Export Mobile App on your Phone!</span>
+            <button type="button" class="app-download-btn" onclick="installMobileApp()">📥 Download App</button>
+        </div>
+    </div>
 
-function parseCSVMatrix(text) {
-    const lines = text.split(/\r?\n/);
-    return lines.map(line => {
-        const row = [];
-        let insideQuote = false;
-        let entry = '';
-        for (let i = 0; i < line.length; i++) {
-            const char = line[i];
-            if (char === '"') {
-                insideQuote = !insideQuote;
-            } else if (char === ',' && !insideQuote) {
-                row.push(entry.trim());
-                entry = '';
-            } else {
-                entry += char;
+    <script>
+        const canvas = document.getElementById('starCanvas');
+        const ctx = canvas.getContext('2d');
+        let stars = [];
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function createStars() {
+            stars = [];
+            const count = Math.floor(window.innerWidth / 12);
+            for (let i = 0; i < count; i++) {
+                stars.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    size: Math.random() * 2.5 + 1,
+                    speedY: Math.random() * 0.8 + 0.3,
+                    opacity: Math.random() * 0.7 + 0.3
+                });
             }
         }
-        row.push(entry.trim());
-        return row;
-    });
-}
+        createStars();
 
-async function syncShippingSheet() {
-    try {
-        const response = await fetch(GOOGLE_SHEET_SHIPPING_URL);
-        if (!response.ok) return { success: false };
-        const csvText = await response.text();
-        const rows = parseCSVMatrix(csvText);
-        if (rows.length < 4) return { success: false };
+        function drawStars() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            stars.forEach(s => {
+                ctx.save();
+                ctx.globalAlpha = s.opacity;
+                ctx.beginPath();
+                ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+                ctx.fillStyle = '#FFD700';
+                ctx.fill();
+                ctx.restore();
+                s.y += s.speedY;
+                if (s.y > canvas.height) s.y = -20;
+            });
+            requestAnimationFrame(drawStars);
+        }
+        drawStars();
 
-        const maxCols = Math.max(...rows.map(r => r.length));
-        let count = 0;
+        let currentAdminPassword = sessionStorage.getItem('adminPassword') || "";
 
-        const query = `
-            INSERT INTO cargo (invoice_number, shipping_date, arrival_date, clearing_warehouse, updated_at)
-            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT(invoice_number) DO UPDATE SET
-                shipping_date = CASE WHEN excluded.shipping_date != '' THEN excluded.shipping_date ELSE cargo.shipping_date END,
-                arrival_date = CASE WHEN excluded.arrival_date != '' THEN excluded.arrival_date ELSE cargo.arrival_date END,
-                clearing_warehouse = CASE WHEN excluded.clearing_warehouse != '' THEN excluded.clearing_warehouse ELSE cargo.clearing_warehouse END,
-                updated_at = CURRENT_TIMESTAMP
-        `;
+        function switchTab(tabName) {
+            document.getElementById('customer').classList.remove('active');
+            document.getElementById('payment').classList.remove('active');
+            document.getElementById('admin').classList.remove('active');
+            document.getElementById('btn-customer').classList.remove('active');
+            document.getElementById('btn-payment').classList.remove('active');
+            document.getElementById('btn-admin').classList.remove('active');
 
-        db.serialize(() => {
-            db.run("BEGIN TRANSACTION");
-            const stmt = db.prepare(query);
-            for (let col = 0; col < maxCols; col++) {
-                const shipDate = (rows[2] && rows[2][col]) ? rows[2][col].trim() : '';
-                const rawArrDate = (rows[3] && rows[3][col]) ? rows[3][col].trim() : '';
-                const warehouseName = extractWarehouseName(shipDate, rawArrDate, '');
+            if (tabName === 'admin') {
+                if (!currentAdminPassword) {
+                    const enteredPass = prompt("🔐 Enter Admin Password:");
+                    if (!enteredPass) {
+                        switchTab('customer');
+                        return;
+                    }
+                    currentAdminPassword = enteredPass.trim();
+                    sessionStorage.setItem('adminPassword', currentAdminPassword);
+                }
+                document.getElementById('adminUpdateForm').style.display = 'block';
+            }
+            document.getElementById(tabName).classList.add('active');
+            document.getElementById('btn-' + tabName).classList.add('active');
+        }
 
-                for (let r = 4; r < rows.length; r++) {
-                    const inv = (rows[r] && rows[r][col]) ? rows[r][col].trim() : '';
-                    if (inv && inv.length >= 2) {
-                        stmt.run([inv, shipDate, rawArrDate, warehouseName]);
-                        count++;
+        async function track() {
+            const inv = document.getElementById('invoice').value.trim();
+            if (!inv) return alert('Please enter Invoice Number');
+            const res = await fetch('/api/track/' + encodeURIComponent(inv));
+            const data = await res.json();
+            const div = document.getElementById('result');
+            if(data.success) {
+                const baseAmount = data.data.amount || 0;
+                const fullPrice = data.data.full_price || baseAmount;
+                div.innerHTML = `
+                    <div class="result-box">
+                        <div class="result-item"><strong>Invoice:</strong> ${data.data.invoice_number}</div>
+                        <div class="result-item"><strong>Name:</strong> ${data.data.customer_name || '-'}</div>
+                        <div class="result-item"><strong>Phone:</strong> ${data.data.customer_phone || '-'}</div>
+                        <div class="result-item"><strong>Destination:</strong> ${data.data.destination || '-'}</div>
+                        <div class="result-item"><strong>Full Price:</strong> ¥${fullPrice.toLocaleString()} JPY</div>
+                        <div class="result-item"><strong>Have to Pay:</strong> ¥${baseAmount.toLocaleString()} JPY</div>
+                        <div class="result-item"><strong>Status:</strong> ${data.data.status || '-'}</div>
+                    </div>
+                    <div style="text-align: center; margin-top: 15px;">
+                        <a href="/api/download-receipt/${encodeURIComponent(data.data.invoice_number)}" target="_blank" style="background:#0284c7; color:white; padding:10px 18px; border-radius:6px; text-decoration:none; font-weight:bold; display:inline-block;">
+                            📄 Download Official PDF Receipt
+                        </a>
+                    </div>
+                `;
+            } else {
+                div.innerHTML = "<p style='color:red;'>Record not found.</p>";
+            }
+        }
+
+        async function updateShipment() {
+            const data = {
+                admin_password: currentAdminPassword,
+                shipping_date: document.getElementById('shippingDate').value,
+                arrival_date: document.getElementById('arrivalDate').value,
+                clearing_warehouse: document.getElementById('clearingWarehouse').value,
+                invoice_number: document.getElementById('inv').value,
+                customer_name: document.getElementById('name').value,
+                customer_phone: document.getElementById('phone').value,
+                amount: document.getElementById('chargeAmount').value,
+                full_price: document.getElementById('fullPriceInput').value,
+                status: document.getElementById('status').value,
+                destination: document.getElementById('dest').value
+            };
+            const res = await fetch('/api/admin/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await res.json();
+            document.getElementById('msg').innerText = result.message;
+            document.getElementById('msg').style.color = result.success ? 'green' : 'red';
+        }
+
+        async function deleteShipment() {
+            const inv = document.getElementById('deleteInv').value.trim();
+            if (!inv) return alert('Enter Invoice');
+            const res = await fetch('/api/admin/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ admin_password: currentAdminPassword, invoice_number: inv })
+            });
+            const result = await res.json();
+            document.getElementById('deleteMsg').innerText = result.message;
+            document.getElementById('deleteMsg').style.color = result.success ? 'green' : 'red';
+        }
+
+        async function uploadCSV() {
+            const file = document.getElementById('csvFile').files[0];
+            if (!file) return alert('Select CSV file');
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const lines = e.target.result.split(/\r?\n/);
+                const shipments = [];
+                for (let i = 1; i < lines.length; i++) {
+                    const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+                    if (cols.length >= 4) {
+                        shipments.push({
+                            arrival_date: cols[0] || '', clearing_warehouse: cols[1] || '',
+                            invoice_number: cols[2] || '', customer_name: cols[3] || '',
+                            status: cols[4] || '', destination: cols[5] || '',
+                            amount: cols[6] || 0, customer_phone: cols[7] || '', shipping_date: cols[8] || ''
+                        });
                     }
                 }
-            }
-            stmt.finalize();
-            db.run("COMMIT");
-        });
-        return { success: true, count };
-    } catch (err) {
-        return { success: false, error: err.message };
-    }
-}
+                const res = await fetch('/api/admin/bulk-update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ admin_password: currentAdminPassword, shipments })
+                });
+                const result = await res.json();
+                document.getElementById('bulkMsg').innerText = result.message;
+                document.getElementById('bulkMsg').style.color = result.success ? 'green' : 'red';
+            };
+            reader.readAsText(file);
+        }
 
-async function syncCustomerSheet() {
-    try {
-        const response = await fetch(GOOGLE_SHEET_CUSTOMER_URL);
-        if (!response.ok) return { success: false };
-        const csvText = await response.text();
-        const rows = parseCSVMatrix(csvText);
-        if (rows.length < 2) return { success: false };
+        function logoutAdmin() {
+            currentAdminPassword = "";
+            sessionStorage.removeItem('adminPassword');
+            switchTab('customer');
+        }
 
-        let count = 0;
-        const query = `
-            INSERT INTO cargo (invoice_number, customer_name, customer_phone, destination, updated_at)
-            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT(invoice_number) DO UPDATE SET
-                customer_name = CASE WHEN excluded.customer_name != '' THEN excluded.customer_name ELSE cargo.customer_name END,
-                customer_phone = CASE WHEN excluded.customer_phone != '' THEN excluded.customer_phone ELSE cargo.customer_phone END,
-                destination = CASE WHEN excluded.destination != '' THEN excluded.destination ELSE cargo.destination END,
-                updated_at = CURRENT_TIMESTAMP
-        `;
+        async function syncGoogleSheetNow() {
+            const res = await fetch('/api/admin/sync-sheet', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ admin_password: currentAdminPassword })
+            });
+            const result = await res.json();
+            alert(result.message);
+        }
 
-        db.serialize(() => {
-            db.run("BEGIN TRANSACTION");
-            const stmt = db.prepare(query);
-
-            for (let r = 1; r < rows.length; r++) {
-                const row = rows[r];
-                const fullLineStr = row.join(' ');
-
-                // Smart Search to handle 8694 and column shifts
-                let inv = (row[14] !== undefined) ? row[14].trim() : '';
-                if (!inv || inv.length < 2) {
-                    const invMatch = fullLineStr.match(/\b(INV-?[0-9]+|[0-9]{4,6})\b/i);
-                    if (invMatch) inv = invMatch[0];
-                }
-
-                let name = (row[22] !== undefined) ? row[22].trim() : '';
-                
-                let phone = (row[25] !== undefined) ? row[25].trim() : '';
-                const phoneMatch = fullLineStr.match(/(\+?[0-9]{10,14})/);
-                if (phoneMatch && !phone) phone = phoneMatch[0];
-                phone = phone.replace(/[^0-9]/g, '');
-
-                let dest = (row[33] !== undefined) ? row[33].trim() : '';
-
-                if (inv && inv !== '') {
-                    stmt.run([inv, name, phone, dest]);
-                    count++;
-                }
-            }
-
-            stmt.finalize();
-            db.run("COMMIT");
-        });
-        return { success: true, count };
-    } catch (err) {
-        return { success: false, error: err.message };
-    }
-}
-
-async function syncAmountSheet() {
-    try {
-        const response = await fetch(GOOGLE_SHEET_AMOUNT_URL);
-        if (!response.ok) return { success: false };
-        const csvText = await response.text();
-        const rows = parseCSVMatrix(csvText);
-        if (rows.length < 2) return { success: false };
-
-        let count = 0;
-        const query = `
-            INSERT INTO cargo (invoice_number, amount, full_price, updated_at)
-            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT(invoice_number) DO UPDATE SET
-                amount = CASE WHEN excluded.amount > 0 THEN excluded.amount ELSE cargo.amount END,
-                full_price = CASE WHEN excluded.full_price > 0 THEN excluded.full_price ELSE cargo.full_price END,
-                updated_at = CURRENT_TIMESTAMP
-        `;
-
-        db.serialize(() => {
-            db.run("BEGIN TRANSACTION");
-            const stmt = db.prepare(query);
-
-            for (let r = 1; r < rows.length; r++) {
-                const row = rows[r];
-                const inv = (row[0] !== undefined) ? row[0].trim() : '';
-                
-                let amt = 0;
-                if (row[10] !== undefined) {
-                    const val = parseFloat(row[10].toString().replace(/[^0-9.-]+/g, ""));
-                    if (!isNaN(val)) amt = val;
-                }
-
-                // Column F (Index 5) for Full Price
-                let fullPrice = 0;
-                if (row[5] !== undefined) {
-                    const valF = parseFloat(row[5].toString().replace(/[^0-9.-]+/g, ""));
-                    if (!isNaN(valF)) fullPrice = valF;
-                }
-                if (fullPrice === 0 && amt > 0) fullPrice = amt;
-
-                if (inv && inv !== '') {
-                    stmt.run([inv, amt, fullPrice]);
-                    count++;
-                }
-            }
-
-            stmt.finalize();
-            db.run("COMMIT");
-        });
-        return { success: true, count };
-    } catch (err) {
-        return { success: false, error: err.message };
-    }
-}
-
-async function syncGoogleSheetData() {
-    const res1 = await syncShippingSheet();
-    const res2 = await syncCustomerSheet();
-    const res3 = await syncAmountSheet();
-    if (res1.success || res2.success || res3.success) {
-        return { success: true, message: `Synced successfully!` };
-    }
-    return { success: false, message: 'Google sheets sync failed.' };
-}
-
-cron.schedule('0 * * * *', () => { syncGoogleSheetData(); });
-
-app.get('/api/track/:invoice', (req, res) => {
-    const invoice = req.params.invoice ? req.params.invoice.trim() : '';
-    if (!invoice) return res.status(400).json({ success: false, message: 'Invoice number is required.' });
-
-    db.get("SELECT * FROM cargo WHERE invoice_number = ?", [invoice], (err, row) => {
-        if (err || !row) return res.status(404).json({ success: false, message: 'Invoice number not found.' });
-
-        const resolvedWarehouse = extractWarehouseName(row.shipping_date, row.arrival_date, row.clearing_warehouse);
-        if (resolvedWarehouse) row.clearing_warehouse = resolvedWarehouse;
-
-        res.json({ success: true, data: row });
-    });
-});
-
-app.post('/api/admin/sync-sheet', async (req, res) => {
-    const { admin_password } = req.body;
-    if (!checkAdminAuth(admin_password)) return res.status(401).json({ success: false, message: 'Invalid Admin Password!' });
-
-    const result = await syncGoogleSheetData();
-    res.json(result);
-});
-
-app.post('/api/admin/update', (req, res) => {
-    const { admin_password, invoice_number, customer_name, customer_phone, shipping_date, arrival_date, clearing_warehouse, amount, full_price, status, destination } = req.body;
-
-    if (!checkAdminAuth(admin_password)) return res.status(401).json({ success: false, message: 'Invalid Admin Password!' });
-    if (!invoice_number) return res.status(400).json({ success: false, message: 'Invoice Number is required.' });
-
-    const cleanInvoice = invoice_number.trim();
-    const cleanAmount = parseFloat(amount) || 0;
-    const cleanFullPrice = parseFloat(full_price) || cleanAmount;
-    let cleanPhone = (customer_phone || '').replace(/[^0-9]/g, '');
-
-    const query = `
-        INSERT INTO cargo (invoice_number, customer_name, customer_phone, shipping_date, arrival_date, clearing_warehouse, amount, full_price, status, destination, whatsapp_sent, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP)
-        ON CONFLICT(invoice_number) DO UPDATE SET
-            customer_name = excluded.customer_name,
-            customer_phone = excluded.customer_phone,
-            shipping_date = excluded.shipping_date,
-            arrival_date = excluded.arrival_date,
-            clearing_warehouse = excluded.clearing_warehouse,
-            amount = excluded.amount,
-            full_price = excluded.full_price,
-            status = excluded.status,
-            destination = excluded.destination,
-            whatsapp_sent = 0,
-            updated_at = CURRENT_TIMESTAMP
-    `;
-
-    db.run(query, [cleanInvoice, customer_name, cleanPhone, shipping_date, arrival_date, clearing_warehouse, cleanAmount, cleanFullPrice, status, destination], function(err) {
-        if (err) return res.status(500).json({ success: false, message: 'Failed to update.' });
-        if (cleanPhone) sendWhatsAppAlert(cleanPhone, customer_name, cleanInvoice, status, arrival_date);
-        res.json({ success: true, message: 'Record updated successfully!' });
-    });
-});
-
-app.post('/api/admin/delete', (req, res) => {
-    const { admin_password, invoice_number } = req.body;
-    if (!checkAdminAuth(admin_password)) return res.status(401).json({ success: false, message: 'Invalid Admin Password!' });
-    if (!invoice_number) return res.status(400).json({ success: false, message: 'Invoice required.' });
-
-    db.run("DELETE FROM cargo WHERE invoice_number = ?", [invoice_number.trim()], function(err) {
-        if (err) return res.status(500).json({ success: false, message: 'Failed to delete.' });
-        if (this.changes === 0) return res.status(404).json({ success: false, message: 'Record not found.' });
-        res.json({ success: true, message: 'Deleted successfully!' });
-    });
-});
-
-app.post('/api/admin/bulk-update', (req, res) => {
-    const { admin_password, shipments } = req.body;
-    if (!checkAdminAuth(admin_password)) return res.status(401).json({ success: false, message: 'Invalid Admin Password!' });
-    if (!Array.isArray(shipments) || shipments.length === 0) return res.status(400).json({ success: false, message: 'No data.' });
-
-    const query = `
-        INSERT INTO cargo (arrival_date, clearing_warehouse, invoice_number, customer_name, status, destination, amount, customer_phone, shipping_date, whatsapp_sent, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP)
-        ON CONFLICT(invoice_number) DO UPDATE SET
-            arrival_date = excluded.arrival_date,
-            clearing_warehouse = excluded.clearing_warehouse,
-            customer_name = excluded.customer_name,
-            status = excluded.status,
-            destination = excluded.destination,
-            amount = excluded.amount,
-            customer_phone = excluded.customer_phone,
-            shipping_date = excluded.shipping_date,
-            whatsapp_sent = 0,
-            updated_at = CURRENT_TIMESTAMP
-    `;
-
-    db.serialize(() => {
-        db.run("BEGIN TRANSACTION");
-        const stmt = db.prepare(query);
-        let count = 0;
-        shipments.forEach(item => {
-            if (item.invoice_number && item.invoice_number.trim()) {
-                stmt.run([
-                    item.arrival_date || '', item.clearing_warehouse || '', item.invoice_number.trim(),
-                    item.customer_name || '', item.status || '', item.destination || '',
-                    parseFloat(item.amount) || 0, (item.customer_phone || '').replace(/[^0-9]/g, ''), item.shipping_date || ''
-                ]);
-                count++;
-            }
-        });
-        stmt.finalize();
-        db.run("COMMIT", (err) => {
-            if (err) return res.status(500).json({ success: false, message: 'Bulk update failed.' });
-            res.json({ success: true, message: `Successfully updated ${count} records!` });
-        });
-    });
-});
-
-app.get('/api/admin/records', (req, res) => {
-    db.all("SELECT * FROM cargo ORDER BY updated_at DESC", [], (err, rows) => {
-        if (err) return res.status(500).json({ success: false, message: 'Server error.' });
-        res.json({ success: true, data: rows || [] });
-    });
-});
-
-// PDF Receipt Generator with Official Letterhead
-app.get('/api/download-receipt/:invoice', (req, res) => {
-    const invoice = req.params.invoice ? req.params.invoice.trim() : '';
-    if (!invoice) return res.status(400).send('Invoice required.');
-
-    db.get("SELECT * FROM cargo WHERE invoice_number = ?", [invoice], (err, row) => {
-        if (err || !row) return res.status(404).send('Record not found.');
-
-        const baseAmount = parseFloat(row.amount) || 0;
-        const fullPrice = parseFloat(row.full_price) || baseAmount;
-        const cardFee = Math.round(baseAmount * 0.042);
-        const totalPayable = baseAmount + cardFee;
-        const resolvedWarehouse = extractWarehouseName(row.shipping_date, row.arrival_date, row.clearing_warehouse) || row.clearing_warehouse || 'N/A';
-
-        const doc = new PDFDocument({ size: 'A4', margin: 40 });
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename=Otek_Receipt_${invoice}.pdf`);
-        doc.pipe(res);
-
-        // --- LETTERHEAD HEADER ---
-        doc.fillColor('#0284c7').fontSize(20).text('OTEK EXPORT CO., LTD', { align: 'center', bold: true });
-        doc.fontSize(9).fillColor('#475569').text('Panorama Cargo Logistics (Pvt) Ltd - Authorized Agent Network', { align: 'center' });
-        doc.text('Japan & Sri Lanka International Freight & Cargo Operations', { align: 'center' });
-        doc.moveDown(0.3);
-        doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor('#0284c7').stroke();
-        doc.moveDown(0.8);
-
-        // --- TITLE ---
-        doc.fillColor('#0f172a').fontSize(13).text('OFFICIAL FREIGHT INVOICE & RECEIPT', { align: 'center', underline: true });
-        doc.moveDown(1);
-
-        // --- SHIPMENT & CUSTOMER DETAILS ---
-        doc.fontSize(10).fillColor('#334155');
-        doc.text(`Receipt Date: ${new Date().toLocaleDateString()}`);
-        doc.text(`Invoice / Tracking No: ${row.invoice_number}`);
-        doc.text(`Customer Name: ${row.customer_name || 'N/A'}`);
-        doc.text(`Customer Phone: ${row.customer_phone || 'N/A'}`);
-        doc.text(`Destination: ${row.destination || 'N/A'}`);
-        doc.text(`Clearing Warehouse: ${resolvedWarehouse}`);
-        doc.text(`Shipping Date: ${row.shipping_date || 'N/A'}`);
-        doc.text(`Arrival Date (ETA): ${row.arrival_date || 'N/A'}`);
-        doc.text(`Status: ${row.status || 'Pending'}`);
-        doc.moveDown(1.2);
-
-        // --- PAYMENT BREAKDOWN ---
-        doc.fillColor('#0369a1').fontSize(11).text('PAYMENT DETAILS BREAKDOWN', { bold: true });
-        doc.moveDown(0.4);
-
-        doc.fontSize(10).fillColor('#0f172a');
-        doc.text(`Full Invoice Price (මුළු වටිනාකම): ¥ ${fullPrice.toLocaleString()} JPY`);
-        doc.text(`Have to Pay (ගෙවිය යුතු ශේෂය): ¥ ${baseAmount.toLocaleString()} JPY`);
-        doc.text(`Card Processing & Service Fee (4.2%): ¥ ${cardFee.toLocaleString()} JPY`);
-        
-        doc.moveDown(0.5);
-        doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor('#cbd5e1').stroke();
-        doc.moveDown(0.5);
-
-        doc.fontSize(12).fillColor('#15803d').text(`Total Amount Payable via Card: ¥ ${totalPayable.toLocaleString()} JPY`, { bold: true });
-
-        // --- NOTICE ---
-        doc.moveDown(2);
-        doc.fontSize(7.5).fillColor('#64748b').text('Notice: Arrival dates and schedules are updated based on real-time data provided by shipping lines.', { align: 'center' });
-        doc.moveDown(0.3);
-        doc.text('Thank you for choosing Otek Export & Panorama Cargo Logistics!', { align: 'center', bold: true });
-
-        // --- LETTERHEAD FOOTER ---
-        doc.moveDown(3);
-        doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor('#0284c7').stroke();
-        doc.moveDown(0.4);
-        doc.fontSize(7.5).fillColor('#475569').text(
-            'OTEK Export Co., Ltd, 560-8, Takatomi Matsuo-Machi, Sanmu-SHI, Chiba, 289-1522, Japan. ' +
-            'Tel / Fax: 047 9856 224 | Mobile: +8190 9296 0709, +8170 2159 2609 | Email: otekmotors1@gmail.com',
-            { align: 'center' }
-        );
-
-        doc.end();
-    });
-});
-
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-app.listen(PORT, () => {
-    console.log(`Server running securely on port ${PORT}`);
-    syncGoogleSheetData();
-});
+        function installMobileApp() {
+            alert("📱 Android/iOS: Open browser menu and select 'Add to Home Screen' or 'Install App'.");
+        }
+    </script>
+</body>
+</html>
