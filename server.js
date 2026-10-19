@@ -87,13 +87,22 @@ function checkAdminAuth(reqPassword) {
 }
 
 async function sendWhatsAppAlert(customerPhone, customerName, invoiceNumber, status, arrivalDate) {
-    if (!customerPhone) return;
+    if (!customerPhone) {
+        console.log("WhatsApp Error: Customer phone is empty for invoice:", invoiceNumber);
+        return;
+    }
     const cleanPhone = customerPhone.replace(/[^0-9]/g, '');
-    if (cleanPhone.length < 9) return;
+    if (cleanPhone.length < 9) {
+        console.log("WhatsApp Error: Invalid phone number length:", customerPhone);
+        return;
+    }
 
     const instanceId = process.env.ULTRAMSG_INSTANCE_ID;
     const token = process.env.ULTRAMSG_TOKEN;
-    if (!instanceId || !token) return;
+    if (!instanceId || !token) {
+        console.log("WhatsApp Error: Instance ID or Token is missing in .env file!");
+        return;
+    }
 
     const messageText = `Hello ${customerName || 'Valued Customer'},\n\n` +
         `📦 *Cargo Shipment Arrival Notice*\n` +
@@ -104,13 +113,15 @@ async function sendWhatsAppAlert(customerPhone, customerName, invoiceNumber, sta
         `Thank you for choosing Otek Export & Panorama Cargo Logistics!`;
 
     try {
-        await fetch(`https://api.ultramsg.com/${instanceId}/messages/chat`, {
+        const response = await fetch(`https://api.ultramsg.com/${instanceId}/messages/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: new URLSearchParams({ token: token, to: cleanPhone, body: messageText })
         });
+        const resultText = await response.text();
+        console.log(`WhatsApp API Response for ${cleanPhone}:`, resultText);
     } catch (err) {
-        console.error("WhatsApp API Error:", err.message);
+        console.error("WhatsApp API Network Error:", err.message);
     }
 }
 
@@ -328,7 +339,7 @@ app.post('/api/admin/tomorrow-eta-list', (req, res) => {
     });
 });
 
-// 📤 Admin: Heta ETA thiyana okkotama eka parata WhatsApp yawana API eka (Fixed)
+// 📤 Admin: Heta ETA thiyana okkotama eka parata WhatsApp yawana API eka
 app.post('/api/admin/send-bulk-whatsapp-tomorrow', async (req, res) => {
     const { admin_password } = req.body;
     if (!checkAdminAuth(admin_password)) {
