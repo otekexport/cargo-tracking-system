@@ -299,24 +299,58 @@ async function syncGoogleSheetData() {
 
 cron.schedule('0 * * * *', () => { syncGoogleSheetData(); });
 
-// 🕒 සෑම දිනකම උදෑසන 8:00 ට අද දිනට (ETA) භාණ්ඩ පැමිණීමට ඇති සියලුම පාරිභෝගිකයින්ට ස්වයංක්‍රීයව WhatsApp පණිවිඩයක් යැවීම
-cron.schedule('0 8 * * *', () => {
-    const todayStr = new Date().toISOString().split('T')[0]; // වර්තමාන දිනය (YYYY-MM-DD)
-    
-    db.all("SELECT * FROM cargo WHERE arrival_date LIKE ?", [`%${todayStr}%`], (err, rows) => {
-        if (err || !rows) return;
+// 📊 Admin: Heta ETA eka thiyana invoice list eka pennana API eka
+app.post('/api/admin/tomorrow-eta-list', (req, res) => {
+    const { admin_password } = req.body;
+    if (!checkAdminAuth(admin_password)) {
+        return res.status(401).json({ success: false, message: 'Invalid Admin Password!' });
+    }
 
-        rows.forEach(row => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+    db.all("SELECT * FROM cargo WHERE arrival_date LIKE ?", [`%${tomorrowStr}%`], (err, rows) => {
+        if (err) return res.status(500).json({ success: false, message: 'Database error.' });
+        res.json({ success: true, date: tomorrowStr, data: rows || [] });
+    });
+});
+
+// 📤 Admin: Heta ETA thiyana okkotama eka parata WhatsApp yawana API eka
+app.post('/api/admin/send-bulk-whatsapp-tomorrow', async (req, res) => {
+    const { admin_password } = req.body;
+    if (!checkAdminAuth(admin_password)) {
+        return res.status(401).json({ success: false, message: 'Invalid Admin Password!' });
+    }
+
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+    db.all("SELECT * FROM cargo WHERE arrival_date LIKE ?", [`%${tomorrowStr}%`], async (err, rows) => {
+        if (err || !rows || rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'No customers found with tomorrow ETA.' });
+        }
+
+        let sentCount = 0;
+        for (const row of rows) {
             if (row.customer_phone) {
-                sendWhatsAppAlert(
-                    row.customer_phone, 
-                    row.customer_name, 
-                    row.invoice_number, 
-                    "Arriving Today at " + (row.clearing_warehouse || 'Warehouse'), 
-                    row.arrival_date
-                );
+                try {
+                    await sendWhatsAppAlert(
+                        row.customer_phone,
+                        row.customer_name,
+                        row.invoice_number,
+                        "Arriving Tomorrow at " + (row.clearing_warehouse || 'Warehouse'),
+                        row.arrival_date
+                    );
+                    sentCount++;
+                } catch (e) {
+                    console.error(`Failed to send for ${row.invoice_number}:`, e.message);
+                }
             }
-        });
+        }
+
+        res.json({ success: true, message: `Successfully sent WhatsApp messages to ${sentCount} customers for tomorrow ETA!` });
     });
 });
 
@@ -510,7 +544,6 @@ app.get('/api/download-receipt/:invoice', (req, res) => {
         res.setHeader('Content-Disposition', `attachment; filename=Otek_Receipt_${invoice}.pdf`);
         doc.pipe(res);
 
-        // --- LETTERHEAD HEADER ---
         doc.fillColor('#0284c7').fontSize(20).text('OTEK EXPORT CO., LTD', { align: 'center', bold: true });
         doc.fontSize(9).fillColor('#475569').text('Panorama Cargo Logistics (Pvt) Ltd - Authorized Agent Network', { align: 'center' });
         doc.text('Japan & Sri Lanka International Freight & Cargo Operations', { align: 'center' });
@@ -518,11 +551,9 @@ app.get('/api/download-receipt/:invoice', (req, res) => {
         doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor('#0284c7').stroke();
         doc.moveDown(0.8);
 
-        // --- TITLE ---
         doc.fillColor('#0f172a').fontSize(13).text('OFFICIAL FREIGHT INVOICE & RECEIPT', { align: 'center', underline: true });
         doc.moveDown(1);
 
-        // --- SHIPMENT & CUSTOMER DETAILS ---
         doc.fontSize(10).fillColor('#334155');
         doc.text(`Receipt Date: ${new Date().toLocaleDateString()}`);
         doc.text(`Invoice / Tracking No: ${row.invoice_number}`);
@@ -535,7 +566,6 @@ app.get('/api/download-receipt/:invoice', (req, res) => {
         doc.text(`Status: ${row.status || 'Pending'}`);
         doc.moveDown(1.2);
 
-        // --- PAYMENT BREAKDOWN ---
         doc.fillColor('#0369a1').fontSize(11).text('PAYMENT DETAILS BREAKDOWN', { bold: true });
         doc.moveDown(0.4);
 
@@ -550,13 +580,11 @@ app.get('/api/download-receipt/:invoice', (req, res) => {
 
         doc.fontSize(12).fillColor('#15803d').text(`Total Amount Payable via Card: ¥ ${totalPayable.toLocaleString()} JPY`, { bold: true });
 
-        // --- NOTICE ---
         doc.moveDown(2);
         doc.fontSize(7.5).fillColor('#64748b').text('Notice: Arrival dates and schedules are updated based on real-time data provided by shipping lines.', { align: 'center' });
         doc.moveDown(0.3);
         doc.text('Thank you for choosing Otek Export & Panorama Cargo Logistics!', { align: 'center', bold: true });
 
-        // --- LETTERHEAD FOOTER ---
         doc.moveDown(3);
         doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor('#0284c7').stroke();
         doc.moveDown(0.4);
