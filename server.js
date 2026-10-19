@@ -263,7 +263,6 @@ async function syncCustomerSheet() {
             db.run("BEGIN TRANSACTION");
             const stmt = db.prepare(query);
 
-            // Row 0 is header. cols[0] = Invoice, cols[1] = Name, cols[2] = Phone, cols[3] = Destination
             for (let r = 1; r < rows.length; r++) {
                 const row = rows[r];
                 const inv = row[0] ? row[0].trim() : '';
@@ -314,12 +313,9 @@ async function syncAmountSheet() {
             db.run("BEGIN TRANSACTION");
             const stmt = db.prepare(query);
 
-            // Row 0 is header. cols[0] = Invoice Number, cols[1] (or relevant index) = Have to Pay Amount
-            // Adjust index if Amount is in another column (e.g., row[1] or row[2])
             for (let r = 1; r < rows.length; r++) {
                 const row = rows[r];
                 const inv = row[0] ? row[0].trim() : '';
-                // Searching for the amount value in the row (filtering numeric/currency strings)
                 let amt = 0;
                 for (let c = 1; c < row.length; c++) {
                     const val = parseFloat(row[c].replace(/[^0-9.-]+/g, ""));
@@ -387,7 +383,7 @@ cron.schedule('0 9 * * *', () => {
     });
 });
 
-// 📌 1. Track Cargo Endpoint (With On-the-Fly Warehouse Resolution)
+// 📌 1. Track Cargo Endpoint
 app.get('/api/track/:invoice', (req, res) => {
     const invoice = req.params.invoice ? req.params.invoice.trim() : '';
     if (!invoice) {
@@ -677,7 +673,7 @@ app.get('/api/download-receipt/:invoice', (req, res) => {
         doc.moveDown(0.5);
 
         doc.fontSize(11).fillColor('#0f172a');
-        doc.text(`Base Freight Charge: ¥ ${baseAmount.toLocaleString()} JPY`);
+        doc.text(`Base Freight Charge (Have to Pay): ¥ ${baseAmount.toLocaleString()} JPY`);
         doc.text(`Card Processing & Service Fee (4.2%): ¥ ${cardFee.toLocaleString()} JPY`);
         
         doc.moveDown(0.5);
@@ -700,6 +696,6 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`Server running securely on port ${PORT} with Triple Google Sheets Sync`);
+    console.log(`Server running securely on port ${PORT} with Stable UI & Triple Sync`);
     syncGoogleSheetData();
 });
