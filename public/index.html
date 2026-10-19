@@ -23,7 +23,6 @@
     <script src="https://js.stripe.com/v3/"></script>
 
     <style>
-        /* Full smooth scrolling enabled for Mouse and Touch */
         html {
             width: 100%;
             height: 100%;
@@ -473,7 +472,7 @@
             color: #0b253a;
         }
 
-        #msg, #loginMsg, #bulkMsg, #deleteMsg, #syncMsg { margin-top: 10px; font-weight: bold; text-align: center; font-size: 13px; }
+        #msg, #loginMsg, #bulkMsg, #deleteMsg, #syncMsg, #bulkWhatsAppMsg { margin-top: 10px; font-weight: bold; text-align: center; font-size: 13px; }
     </style>
 </head>
 <body>
@@ -558,6 +557,18 @@
                     <button class="submit-btn sync-btn" style="flex:1;" onclick="syncGoogleSheetNow()">🔄 Sync Triple Google Sheets Now</button>
                 </div>
                 <div id="syncMsg"></div>
+
+                <div class="section-divider"></div>
+
+                <h4 style="margin: 0 0 5px 0; color: #0284c7;">📋 Tomorrow's ETA Preview & Bulk WhatsApp</h4>
+                <p style="font-size: 12px; color: #64748b; margin-bottom: 8px;">හෙට (Tomorrow) ETA එක ඇති කාගෝ ලැයිස්තුව පරීක්ෂා කර, අවශ්‍ය නම් සියලුම පාරිභෝගිකයින්ට එකවර WhatsApp පණිවිඩ යවන්න.</p>
+                <button class="submit-btn" style="background: #0284c7;" onclick="loadTomorrowEtaList()">🔍 Check Tomorrow's ETA List</button>
+
+                <div id="tomorrowEtaContainer" style="margin-top: 12px; display: none; background: #f8fafc; border: 1px solid #cbd5e1; padding: 12px; border-radius: 8px;">
+                    <div id="tomorrowEtaResults" style="font-size: 13px; max-height: 200px; overflow-y: auto; margin-bottom: 10px;"></div>
+                    <button class="submit-btn" style="background: #25D366; display: none;" id="sendBulkBtn" onclick="sendBulkTomorrowWhatsApp()">📤 Send WhatsApp to All Above Customers</button>
+                </div>
+                <div id="bulkWhatsAppMsg"></div>
 
                 <div class="section-divider"></div>
 
@@ -803,6 +814,73 @@
             return activeStep;
         }
 
+        async function loadTomorrowEtaList() {
+            const resultsDiv = document.getElementById('tomorrowEtaResults');
+            const container = document.getElementById('tomorrowEtaContainer');
+            const bulkBtn = document.getElementById('sendBulkBtn');
+            
+            container.style.display = 'block';
+            resultsDiv.innerHTML = "⏳ Loading tomorrow's ETA list...";
+            bulkBtn.style.display = 'none';
+
+            try {
+                const res = await fetch('/api/admin/tomorrow-eta-list', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ admin_password: currentAdminPassword })
+                });
+                const result = await res.json();
+
+                if (result.success) {
+                    if (result.data.length === 0) {
+                        resultsDiv.innerHTML = `<p style="color: #64748b; margin: 0;">No shipments scheduled for arrival tomorrow (${result.date}).</p>`;
+                    } else {
+                        let html = `<b style="color: #0f172a;">Found ${result.data.length} customer(s) for ${result.date}:</b><ul style="margin: 5px 0 0 0; padding-left: 20px;">`;
+                        result.data.forEach(item => {
+                            html += `<li><b>Inv:</b> ${item.invoice_number} | <b>Name:</b> ${item.customer_name || 'N/A'} | <b>Phone:</b> ${item.customer_phone || 'N/A'}</li>`;
+                        });
+                        html += `</ul>`;
+                        resultsDiv.innerHTML = html;
+                        bulkBtn.style.display = 'block';
+                    }
+                } else {
+                    resultsDiv.innerHTML = `<p style="color: red;">${result.message}</p>`;
+                    if (result.message === 'Invalid Admin Password!') logoutAdmin();
+                }
+            } catch (err) {
+                resultsDiv.innerHTML = `<p style="color: red;">Error: ${err.message}</p>`;
+            }
+        }
+
+        async function sendBulkTomorrowWhatsApp() {
+            if (!confirm("Are you sure you want to send WhatsApp messages to all customers arriving tomorrow?")) return;
+
+            const bulkMsg = document.getElementById('bulkWhatsAppMsg');
+            bulkMsg.style.color = "#0284c7";
+            bulkMsg.innerText = "⏳ Sending bulk WhatsApp messages...";
+
+            try {
+                const res = await fetch('/api/admin/send-bulk-whatsapp-tomorrow', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ admin_password: currentAdminPassword })
+                });
+                const result = await res.json();
+
+                if (result.success) {
+                    bulkMsg.style.color = "green";
+                    bulkMsg.innerText = result.message;
+                } else {
+                    bulkMsg.style.color = "red";
+                    bulkMsg.innerText = result.message || "Failed to send bulk messages!";
+                    if (result.message === 'Invalid Admin Password!') logoutAdmin();
+                }
+            } catch (err) {
+                bulkMsg.style.color = "red";
+                bulkMsg.innerText = "Error: " + err.message;
+            }
+        }
+
         async function track() {
             const inv = document.getElementById('invoice').value.trim();
             if (!inv) return alert('Please enter Invoice Number');
@@ -849,7 +927,7 @@
                     </div>
                 `;
 
-               div.innerHTML = `
+                div.innerHTML = `
                     <div class="result-box">
                         <div class="result-item"><strong>Arrival Date (ETA):</strong> ${data.data.arrival_date || '-'}</div>
                         <div class="result-item"><strong>Clearing Warehouse:</strong> ${data.data.clearing_warehouse || '-'}</div>
@@ -1154,7 +1232,7 @@
                     const shipments = [];
 
                     for (let i = 1; i < lines.length; i++) {
-                        const line = lines.line ? lines[i].trim() : lines[i].trim();
+                        const line = lines[i].trim();
                         if (!line) continue;
                         
                         const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/^["']\vert{}["']$/g, ''));
