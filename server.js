@@ -14,12 +14,11 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
-// 📊 Google Sheet URLs (Triple Sheets)
+// 📊 Google Sheet URLs
 const GOOGLE_SHEET_SHIPPING_URL = 'https://docs.google.com/spreadsheets/d/1iWvwlNWxX9LV5AssmlMw-wYeF09ILncXamjulrdihDQ/export?format=csv';
 const GOOGLE_SHEET_CUSTOMER_URL = 'https://docs.google.com/spreadsheets/d/165g39MP4HHIrMulhqM3Ot8isCrp5FP_0ZwtX8Aafg-A/export?format=csv&gid=757565291';
 const GOOGLE_SHEET_AMOUNT_URL = 'https://docs.google.com/spreadsheets/d/104cDSC0HcAr1S8zJQZhRITIdqNuBj1RUH9L1CYHOtJg/export?format=csv';
 
-// 🏢 Warehouse Short Code to Full Name Mapping
 const WAREHOUSE_MAP = {
     'LAK': 'Laksiri Warehouse in Peliyagoda',
     'NNR': 'NNR Peliyagoda',
@@ -38,55 +37,29 @@ function extractWarehouseName(shipDateStr, arrDateStr, warehouseStr) {
     return warehouseStr || '';
 }
 
-// 🛡️ Proxy Trust & Security Headers
 app.set('trust proxy', 1);
 
 app.use(helmet({
     contentSecurityPolicy: false,
-    strictTransportSecurity: {
-        maxAge: 31536000,
-        includeSubDomains: true,
-        preload: true
-    }
+    strictTransportSecurity: { maxAge: 31536000, includeSubDomains: true, preload: true }
 }));
 
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
-// 🛡️ Rate Limiting
-const generalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { success: false, message: 'Too many requests from this IP. Please try again after 15 minutes.' }
-});
-
-const adminLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 10,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { success: false, message: 'Too many admin authorization attempts. Try again after 15 minutes.' }
-});
+const generalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
+const adminLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10 });
 
 app.use('/api/', generalLimiter);
 app.use('/api/admin/', adminLimiter);
-
-// Static Files
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Database Connection
 const db = new sqlite3.Database('./cargo.db', (err) => {
-    if (err) {
-        console.error('Database connection error:', err.message);
-    } else {
-        console.log('Connected securely to SQLite database.');
-    }
+    if (err) console.error('Database connection error:', err.message);
+    else console.log('Connected securely to SQLite database.');
 });
 
-// Database Table Schema Setup
 db.serialize(() => {
     db.run(`
         CREATE TABLE IF NOT EXISTS cargo (
@@ -108,22 +81,18 @@ db.serialize(() => {
     `);
 });
 
-// Helper: Secure Admin Auth Check
 function checkAdminAuth(reqPassword) {
     if (!ADMIN_PASSWORD) return false;
     return reqPassword === ADMIN_PASSWORD;
 }
 
-// 📲 Helper: Send WhatsApp Alert via UltraMsg API
 async function sendWhatsAppAlert(customerPhone, customerName, invoiceNumber, status, arrivalDate) {
     if (!customerPhone) return;
-
     const cleanPhone = customerPhone.replace(/[^0-9]/g, '');
     if (cleanPhone.length < 9) return;
 
     const instanceId = process.env.ULTRAMSG_INSTANCE_ID;
     const token = process.env.ULTRAMSG_TOKEN;
-
     if (!instanceId || !token) return;
 
     const messageText = `Hello ${customerName || 'Valued Customer'},\n\n` +
@@ -145,7 +114,6 @@ async function sendWhatsAppAlert(customerPhone, customerName, invoiceNumber, sta
     }
 }
 
-// 📊 Helper: Parse CSV Matrix
 function parseCSVMatrix(text) {
     const lines = text.split(/\r?\n/);
     return lines.map(line => {
@@ -168,21 +136,16 @@ function parseCSVMatrix(text) {
     });
 }
 
-// 🔄 Core Engine 1: Sync Shipping Sheet
 async function syncShippingSheet() {
-    console.log('🔄 Syncing Shipping Google Sheet...');
     try {
         const response = await fetch(GOOGLE_SHEET_SHIPPING_URL);
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-        
+        if (!response.ok) return { success: false };
         const csvText = await response.text();
         const rows = parseCSVMatrix(csvText);
-
-        if (rows.length < 4) return { success: false, message: 'Invalid shipping sheet format.' };
+        if (rows.length < 4) return { success: false };
 
         const maxCols = Math.max(...rows.map(r => r.length));
         let count = 0;
-
         const query = `
             INSERT INTO cargo (invoice_number, shipping_date, arrival_date, clearing_warehouse, updated_at)
             VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
@@ -196,7 +159,6 @@ async function syncShippingSheet() {
         db.serialize(() => {
             db.run("BEGIN TRANSACTION");
             const stmt = db.prepare(query);
-
             for (let col = 0; col < maxCols; col++) {
                 const shipDate = (rows[2] && rows[2][col]) ? rows[2][col].trim() : '';
                 const rawArrDate = (rows[3] && rows[3][col]) ? rows[3][col].trim() : '';
@@ -204,36 +166,28 @@ async function syncShippingSheet() {
 
                 for (let r = 4; r < rows.length; r++) {
                     const inv = (rows[r] && rows[r][col]) ? rows[r][col].trim() : '';
-                    if (inv && inv !== '' && inv.length >= 2) {
+                    if (inv && inv.length >= 2) {
                         stmt.run([inv, shipDate, rawArrDate, warehouseName]);
                         count++;
                     }
                 }
             }
-
             stmt.finalize();
             db.run("COMMIT");
         });
-
-        console.log(`✅ Shipping Sheet Synced: ${count} records processed.`);
         return { success: true, count };
     } catch (err) {
-        console.error("Shipping Sheet Sync Failed:", err.message);
         return { success: false, error: err.message };
     }
 }
 
-// 🔄 Core Engine 2: Sync Customer Details Sheet (Smart Search for 8694 & Phone numbers)
 async function syncCustomerSheet() {
-    console.log('🔄 Syncing Customer Details Sheet (Smart Search)...');
     try {
         const response = await fetch(GOOGLE_SHEET_CUSTOMER_URL);
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-        
+        if (!response.ok) return { success: false };
         const csvText = await response.text();
         const rows = parseCSVMatrix(csvText);
-
-        if (rows.length < 2) return { success: false, message: 'Customer sheet is empty.' };
+        if (rows.length < 2) return { success: false };
 
         let count = 0;
         const query = `
@@ -249,12 +203,10 @@ async function syncCustomerSheet() {
         db.serialize(() => {
             db.run("BEGIN TRANSACTION");
             const stmt = db.prepare(query);
-
             for (let r = 1; r < rows.length; r++) {
                 const row = rows[r];
                 const fullLineStr = row.join(' ');
 
-                // Smart Search: Find Invoice Number (handles 8694 or INV-...)
                 let inv = (row[14] !== undefined) ? row[14].trim() : '';
                 if (!inv || inv.length < 2) {
                     const invMatch = fullLineStr.match(/\b(INV-?[0-9]+|[0-9]{4,6})\b/i);
@@ -262,12 +214,9 @@ async function syncCustomerSheet() {
                 }
 
                 let name = (row[22] !== undefined) ? row[22].trim() : '';
-                
                 let phone = (row[25] !== undefined) ? row[25].trim() : '';
                 const phoneMatch = fullLineStr.match(/(\+?[0-9]{10,14})/);
-                if (phoneMatch && !phone) {
-                    phone = phoneMatch[0];
-                }
+                if (phoneMatch && !phone) phone = phoneMatch[0];
                 phone = phone.replace(/[^0-9]/g, '');
 
                 let dest = (row[33] !== undefined) ? row[33].trim() : '';
@@ -277,30 +226,22 @@ async function syncCustomerSheet() {
                     count++;
                 }
             }
-
             stmt.finalize();
             db.run("COMMIT");
         });
-
-        console.log(`✅ Customer Sheet Synced: ${count} records processed.`);
         return { success: true, count };
     } catch (err) {
-        console.error("Customer Sheet Sync Failed:", err.message);
         return { success: false, error: err.message };
     }
 }
 
-// 🔄 Core Engine 3: Sync Amount Sheet (Column K for Balance, Column F for Full Price)
 async function syncAmountSheet() {
-    console.log('🔄 Syncing Amount Google Sheet...');
     try {
         const response = await fetch(GOOGLE_SHEET_AMOUNT_URL);
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-        
+        if (!response.ok) return { success: false };
         const csvText = await response.text();
         const rows = parseCSVMatrix(csvText);
-
-        if (rows.length < 2) return { success: false, message: 'Amount sheet is empty.' };
+        if (rows.length < 2) return { success: false };
 
         let count = 0;
         const query = `
@@ -315,7 +256,6 @@ async function syncAmountSheet() {
         db.serialize(() => {
             db.run("BEGIN TRANSACTION");
             const stmt = db.prepare(query);
-
             for (let r = 1; r < rows.length; r++) {
                 const row = rows[r];
                 const inv = (row[0] !== undefined) ? row[0].trim() : '';
@@ -338,15 +278,11 @@ async function syncAmountSheet() {
                     count++;
                 }
             }
-
             stmt.finalize();
             db.run("COMMIT");
         });
-
-        console.log(`✅ Amount Sheet Synced: ${count} records processed.`);
         return { success: true, count };
     } catch (err) {
-        console.error("Amount Sheet Sync Failed:", err.message);
         return { success: false, error: err.message };
     }
 }
@@ -363,7 +299,6 @@ async function syncGoogleSheetData() {
 
 cron.schedule('0 * * * *', () => { syncGoogleSheetData(); });
 
-// 📌 1. Track Cargo Endpoint
 app.get('/api/track/:invoice', (req, res) => {
     const invoice = req.params.invoice ? req.params.invoice.trim() : '';
     if (!invoice) return res.status(400).json({ success: false, message: 'Invoice number is required.' });
@@ -378,16 +313,13 @@ app.get('/api/track/:invoice', (req, res) => {
     });
 });
 
-// 📌 2. Admin Manual Sync
 app.post('/api/admin/sync-sheet', async (req, res) => {
     const { admin_password } = req.body;
     if (!checkAdminAuth(admin_password)) return res.status(401).json({ success: false, message: 'Invalid Admin Password!' });
-
     const result = await syncGoogleSheetData();
     res.json(result);
 });
 
-// 📌 3. Admin Update Endpoint
 app.post('/api/admin/update', (req, res) => {
     const { admin_password, invoice_number, customer_name, customer_phone, shipping_date, arrival_date, clearing_warehouse, amount, full_price, status, destination } = req.body;
 
@@ -423,7 +355,68 @@ app.post('/api/admin/update', (req, res) => {
     });
 });
 
-// 📌 4. PDF Receipt Generator (with Official Letterhead & Dual Prices)
+app.post('/api/admin/delete', (req, res) => {
+    const { admin_password, invoice_number } = req.body;
+    if (!checkAdminAuth(admin_password)) return res.status(401).json({ success: false, message: 'Invalid Admin Password!' });
+    if (!invoice_number) return res.status(400).json({ success: false, message: 'Invoice Number is required.' });
+
+    db.run("DELETE FROM cargo WHERE invoice_number = ?", [invoice_number.trim()], function(err) {
+        if (err) return res.status(500).json({ success: false, message: 'Failed to delete.' });
+        if (this.changes === 0) return res.status(404).json({ success: false, message: 'Record not found.' });
+        res.json({ success: true, message: 'Invoice deleted successfully!' });
+    });
+});
+
+app.post('/api/admin/bulk-update', (req, res) => {
+    const { admin_password, shipments } = req.body;
+    if (!checkAdminAuth(admin_password)) return res.status(401).json({ success: false, message: 'Invalid Admin Password!' });
+    if (!Array.isArray(shipments) || shipments.length === 0) return res.status(400).json({ success: false, message: 'No shipment data.' });
+
+    const query = `
+        INSERT INTO cargo (arrival_date, clearing_warehouse, invoice_number, customer_name, status, destination, amount, customer_phone, shipping_date, whatsapp_sent, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP)
+        ON CONFLICT(invoice_number) DO UPDATE SET
+            arrival_date = excluded.arrival_date,
+            clearing_warehouse = excluded.clearing_warehouse,
+            customer_name = excluded.customer_name,
+            status = excluded.status,
+            destination = excluded.destination,
+            amount = excluded.amount,
+            customer_phone = excluded.customer_phone,
+            shipping_date = excluded.shipping_date,
+            whatsapp_sent = 0,
+            updated_at = CURRENT_TIMESTAMP
+    `;
+
+    db.serialize(() => {
+        db.run("BEGIN TRANSACTION");
+        const stmt = db.prepare(query);
+        let count = 0;
+        shipments.forEach(item => {
+            if (item.invoice_number && item.invoice_number.trim()) {
+                stmt.run([
+                    item.arrival_date || '', item.clearing_warehouse || '', item.invoice_number.trim(),
+                    item.customer_name || '', item.status || '', item.destination || '',
+                    parseFloat(item.amount) || 0, (item.customer_phone || '').replace(/[^0-9]/g, ''), item.shipping_date || ''
+                ]);
+                count++;
+            }
+        });
+        stmt.finalize();
+        db.run("COMMIT", (err) => {
+            if (err) return res.status(500).json({ success: false, message: 'Bulk upload failed.' });
+            res.json({ success: true, message: `Successfully updated ${count} records!` });
+        });
+    });
+});
+
+app.get('/api/admin/records', (req, res) => {
+    db.all("SELECT * FROM cargo ORDER BY updated_at DESC", [], (err, rows) => {
+        if (err) return res.status(500).json({ success: false, message: 'Server error.' });
+        res.json({ success: true, data: rows || [] });
+    });
+});
+
 app.get('/api/download-receipt/:invoice', (req, res) => {
     const invoice = req.params.invoice ? req.params.invoice.trim() : '';
     if (!invoice) return res.status(400).send('Invoice required.');
@@ -442,7 +435,6 @@ app.get('/api/download-receipt/:invoice', (req, res) => {
         res.setHeader('Content-Disposition', `attachment; filename=Otek_Receipt_${invoice}.pdf`);
         doc.pipe(res);
 
-        // --- LETTERHEAD HEADER ---
         doc.fillColor('#0284c7').fontSize(20).text('OTEK EXPORT CO., LTD', { align: 'center', bold: true });
         doc.fontSize(9).fillColor('#475569').text('Panorama Cargo Logistics (Pvt) Ltd - Authorized Agent Network', { align: 'center' });
         doc.text('Japan & Sri Lanka International Freight & Cargo Operations', { align: 'center' });
@@ -450,11 +442,9 @@ app.get('/api/download-receipt/:invoice', (req, res) => {
         doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor('#0284c7').stroke();
         doc.moveDown(0.8);
 
-        // --- TITLE ---
         doc.fillColor('#0f172a').fontSize(13).text('OFFICIAL FREIGHT INVOICE & RECEIPT', { align: 'center', underline: true });
         doc.moveDown(1);
 
-        // --- SHIPMENT & CUSTOMER DETAILS ---
         doc.fontSize(10).fillColor('#334155');
         doc.text(`Receipt Date: ${new Date().toLocaleDateString()}`);
         doc.text(`Invoice / Tracking No: ${row.invoice_number}`);
@@ -467,7 +457,6 @@ app.get('/api/download-receipt/:invoice', (req, res) => {
         doc.text(`Status: ${row.status || 'Pending'}`);
         doc.moveDown(1.2);
 
-        // --- PAYMENT BREAKDOWN ---
         doc.fillColor('#0369a1').fontSize(11).text('PAYMENT DETAILS BREAKDOWN', { bold: true });
         doc.moveDown(0.4);
 
@@ -482,13 +471,11 @@ app.get('/api/download-receipt/:invoice', (req, res) => {
 
         doc.fontSize(12).fillColor('#15803d').text(`Total Amount Payable via Card: ¥ ${totalPayable.toLocaleString()} JPY`, { bold: true });
 
-        // --- NOTICE ---
         doc.moveDown(2);
-        doc.fontSize(7.5).fillColor('#64748b').text('Notice: Arrival dates and schedules are updated based on real-time data provided by shipping lines and may be subject to minor changes.', { align: 'center' });
+        doc.fontSize(7.5).fillColor('#64748b').text('Notice: Arrival dates and schedules are updated based on real-time data provided by shipping lines.', { align: 'center' });
         doc.moveDown(0.3);
         doc.text('Thank you for choosing Otek Export & Panorama Cargo Logistics!', { align: 'center', bold: true });
 
-        // --- LETTERHEAD FOOTER ---
         doc.moveDown(3);
         doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor('#0284c7').stroke();
         doc.moveDown(0.4);
@@ -507,6 +494,6 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`Server running securely on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
     syncGoogleSheetData();
 });
