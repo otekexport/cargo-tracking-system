@@ -13,7 +13,11 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
-const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1iWvwlNWxX9LV5AssmlMw-wYeF09ILncXamjulrdihDQ/export?format=csv';
+
+// 📊 Google Sheet URLs (Triple Sheets)
+const GOOGLE_SHEET_SHIPPING_URL = 'https://docs.google.com/spreadsheets/d/1iWvwlNWxX9LV5AssmlMw-wYeF09ILncXamjulrdihDQ/export?format=csv';
+const GOOGLE_SHEET_CUSTOMER_URL = 'https://docs.google.com/spreadsheets/d/165g39MP4HHIrMulhqM3Ot8isCrp5FP_0ZwtX8Aafg-A/export?format=csv';
+const GOOGLE_SHEET_AMOUNT_URL = 'https://docs.google.com/spreadsheets/d/104cDSC0HcAr1S8zJQZhRITIdqNuBj1RUH9L1CYHOtJg/export?format=csv';
 
 // 🏢 Warehouse Short Code to Full Name Mapping
 const WAREHOUSE_MAP = {
@@ -24,7 +28,7 @@ const WAREHOUSE_MAP = {
     'SER': 'Ceylon Logistics Worldwide (Pvt) Ltd'
 };
 
-// Helper: Extract Warehouse Full Name from Any Field (Shipping Date, Arrival Date, Warehouse)
+// Helper: Extract Warehouse Full Name
 function extractWarehouseName(shipDateStr, arrDateStr, warehouseStr) {
     const combined = ((shipDateStr || '') + ' ' + (arrDateStr || '') + ' ' + (warehouseStr || '')).toUpperCase();
     for (const [code, fullName] of Object.entries(WAREHOUSE_MAP)) {
@@ -177,23 +181,20 @@ function parseCSVMatrix(text) {
     });
 }
 
-// 🔄 Core Engine: Fetch & Sync Data from Google Sheet
-async function syncGoogleSheetData() {
-    console.log('🔄 Syncing Google Sheet Data...');
+// 🔄 Core Engine 1: Sync Shipping Sheet
+async function syncShippingSheet() {
+    console.log('🔄 Syncing Shipping Google Sheet...');
     try {
-        const response = await fetch(GOOGLE_SHEET_CSV_URL);
+        const response = await fetch(GOOGLE_SHEET_SHIPPING_URL);
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
         
         const csvText = await response.text();
         const rows = parseCSVMatrix(csvText);
 
-        if (rows.length < 4) {
-            console.log('Sheet format invalid: Expected at least 4 rows.');
-            return { success: false, message: 'Invalid sheet format.' };
-        }
+        if (rows.length < 4) return { success: false, message: 'Invalid shipping sheet format.' };
 
         const maxCols = Math.max(...rows.map(r => r.length));
-        let totalCount = 0;
+        let count = 0;
 
         const query = `
             INSERT INTO cargo (invoice_number, shipping_date, arrival_date, clearing_warehouse, updated_at)
@@ -210,41 +211,154 @@ async function syncGoogleSheetData() {
             const stmt = db.prepare(query);
 
             for (let col = 0; col < maxCols; col++) {
-                // Row 0: Container No (Skipped)
-                // Row 1: Comments (Skipped)
-                // Row 2: Shipping Date (e.g. "2026/08/20 SER")
-                // Row 3: Arrival Date / ETA (e.g. "ETA 2026/09/29")
                 const shipDate = (rows[2] && rows[2][col]) ? rows[2][col].trim() : '';
                 const rawArrDate = (rows[3] && rows[3][col]) ? rows[3][col].trim() : '';
-
-                // Extract Warehouse Name from Code
                 const warehouseName = extractWarehouseName(shipDate, rawArrDate, '');
 
-                // Row 4 onwards: Invoice Numbers
                 for (let r = 4; r < rows.length; r++) {
                     const inv = (rows[r] && rows[r][col]) ? rows[r][col].trim() : '';
                     if (inv && inv !== '' && inv.length >= 2) {
                         stmt.run([inv, shipDate, rawArrDate, warehouseName]);
-                        totalCount++;
+                        count++;
                     }
                 }
             }
 
             stmt.finalize();
-            db.run("COMMIT", (err) => {
-                if (err) console.error("Error committing Google Sheet transaction:", err);
-                else console.log(`✅ Google Sheet Sync Completed! ${totalCount} records processed.`);
-            });
+            db.run("COMMIT");
         });
 
-        return { success: true, count: totalCount };
+        console.log(`✅ Shipping Sheet Synced: ${count} records processed.`);
+        return { success: true, count };
     } catch (err) {
-        console.error("Google Sheet Sync Failed:", err.message);
+        console.error("Shipping Sheet Sync Failed:", err.message);
         return { success: false, error: err.message };
     }
 }
 
-// ⏰ Hourly Cron Job: Auto-Sync Google Sheet
+// 🔄 Core Engine 2: Sync Customer Details Sheet
+async function syncCustomerSheet() {
+    console.log('🔄 Syncing Customer Details Google Sheet...');
+    try {
+        const response = await fetch(GOOGLE_SHEET_CUSTOMER_URL);
+        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+        
+        const csvText = await response.text();
+        const rows = parseCSVMatrix(csvText);
+
+        if (rows.length < 2) return { success: false, message: 'Customer sheet is empty.' };
+
+        let count = 0;
+        const query = `
+            INSERT INTO cargo (invoice_number, customer_name, customer_phone, destination, updated_at)
+            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(invoice_number) DO UPDATE SET
+                customer_name = CASE WHEN excluded.customer_name != '' THEN excluded.customer_name ELSE cargo.customer_name END,
+                customer_phone = CASE WHEN excluded.customer_phone != '' THEN excluded.customer_phone ELSE cargo.customer_phone END,
+                destination = CASE WHEN excluded.destination != '' THEN excluded.destination ELSE cargo.destination END,
+                updated_at = CURRENT_TIMESTAMP
+        `;
+
+        db.serialize(() => {
+            db.run("BEGIN TRANSACTION");
+            const stmt = db.prepare(query);
+
+            // Row 0 is header. cols[0] = Invoice, cols[1] = Name, cols[2] = Phone, cols[3] = Destination
+            for (let r = 1; r < rows.length; r++) {
+                const row = rows[r];
+                const inv = row[0] ? row[0].trim() : '';
+                const name = row[1] ? row[1].trim() : '';
+                const phone = row[2] ? row[2].trim() : '';
+                const dest = row[3] ? row[3].trim() : '';
+
+                if (inv && inv !== '') {
+                    stmt.run([inv, name, phone, dest]);
+                    count++;
+                }
+            }
+
+            stmt.finalize();
+            db.run("COMMIT");
+        });
+
+        console.log(`✅ Customer Sheet Synced: ${count} records processed.`);
+        return { success: true, count };
+    } catch (err) {
+        console.error("Customer Sheet Sync Failed:", err.message);
+        return { success: false, error: err.message };
+    }
+}
+
+// 🔄 Core Engine 3: Sync Have to Pay / Amount Sheet
+async function syncAmountSheet() {
+    console.log('🔄 Syncing Have to Pay / Amount Google Sheet...');
+    try {
+        const response = await fetch(GOOGLE_SHEET_AMOUNT_URL);
+        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+        
+        const csvText = await response.text();
+        const rows = parseCSVMatrix(csvText);
+
+        if (rows.length < 2) return { success: false, message: 'Amount sheet is empty.' };
+
+        let count = 0;
+        const query = `
+            INSERT INTO cargo (invoice_number, amount, updated_at)
+            VALUES (?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(invoice_number) DO UPDATE SET
+                amount = CASE WHEN excluded.amount > 0 THEN excluded.amount ELSE cargo.amount END,
+                updated_at = CURRENT_TIMESTAMP
+        `;
+
+        db.serialize(() => {
+            db.run("BEGIN TRANSACTION");
+            const stmt = db.prepare(query);
+
+            // Row 0 is header. cols[0] = Invoice Number, cols[1] (or relevant index) = Have to Pay Amount
+            // Adjust index if Amount is in another column (e.g., row[1] or row[2])
+            for (let r = 1; r < rows.length; r++) {
+                const row = rows[r];
+                const inv = row[0] ? row[0].trim() : '';
+                // Searching for the amount value in the row (filtering numeric/currency strings)
+                let amt = 0;
+                for (let c = 1; c < row.length; c++) {
+                    const val = parseFloat(row[c].replace(/[^0-9.-]+/g, ""));
+                    if (!isNaN(val) && val > 0) {
+                        amt = val;
+                        break;
+                    }
+                }
+
+                if (inv && inv !== '') {
+                    stmt.run([inv, amt]);
+                    count++;
+                }
+            }
+
+            stmt.finalize();
+            db.run("COMMIT");
+        });
+
+        console.log(`✅ Amount Sheet Synced: ${count} records processed.`);
+        return { success: true, count };
+    } catch (err) {
+        console.error("Amount Sheet Sync Failed:", err.message);
+        return { success: false, error: err.message };
+    }
+}
+
+// Combined Triple Sync Function
+async function syncGoogleSheetData() {
+    const res1 = await syncShippingSheet();
+    const res2 = await syncCustomerSheet();
+    const res3 = await syncAmountSheet();
+    if (res1.success || res2.success || res3.success) {
+        return { success: true, message: `Synced Shipping (${res1.count || 0}), Customer (${res2.count || 0}) & Amount (${res3.count || 0}) records successfully!` };
+    }
+    return { success: false, message: 'Google sheets sync failed.' };
+}
+
+// ⏰ Hourly Cron Job: Auto-Sync Google Sheets
 cron.schedule('0 * * * *', () => {
     syncGoogleSheetData();
 });
@@ -273,7 +387,7 @@ cron.schedule('0 9 * * *', () => {
     });
 });
 
-// 📌 1. Track Cargo Endpoint (With On-the-Fly Warehouse Detection)
+// 📌 1. Track Cargo Endpoint (With On-the-Fly Warehouse Resolution)
 app.get('/api/track/:invoice', (req, res) => {
     const invoice = req.params.invoice ? req.params.invoice.trim() : '';
     if (!invoice) {
@@ -289,7 +403,6 @@ app.get('/api/track/:invoice', (req, res) => {
             return res.status(404).json({ success: false, message: 'Invoice number not found. Please double check.' });
         }
 
-        // 💡 Dynamic Warehouse Resolution: On-the-fly detection
         const resolvedWarehouse = extractWarehouseName(row.shipping_date, row.arrival_date, row.clearing_warehouse);
         if (resolvedWarehouse) {
             row.clearing_warehouse = resolvedWarehouse;
@@ -308,7 +421,7 @@ app.post('/api/admin/sync-sheet', async (req, res) => {
 
     const result = await syncGoogleSheetData();
     if (result.success) {
-        res.json({ success: true, message: `Google Sheet Sync Successful! Processed ${result.count} records.` });
+        res.json({ success: true, message: result.message });
     } else {
         res.status(500).json({ success: false, message: `Sync Failed: ${result.error || result.message}` });
     }
@@ -587,6 +700,6 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`Server running securely on port ${PORT} with Dynamic Warehouse Resolution`);
+    console.log(`Server running securely on port ${PORT} with Triple Google Sheets Sync`);
     syncGoogleSheetData();
 });
