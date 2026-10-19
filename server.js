@@ -330,6 +330,7 @@ app.post('/api/admin/tomorrow-eta-list', (req, res) => {
 });
 
 // 📤 Admin: Heta ETA thiyana okkotama eka parata WhatsApp yawana API eka
+// 📤 Admin: Heta ETA thiyana okkotama eka parata WhatsApp yawana API eka (Fixed)
 app.post('/api/admin/send-bulk-whatsapp-tomorrow', async (req, res) => {
     const { admin_password } = req.body;
     if (!checkAdminAuth(admin_password)) {
@@ -338,11 +339,27 @@ app.post('/api/admin/send-bulk-whatsapp-tomorrow', async (req, res) => {
 
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+    
+    const year = tomorrow.getFullYear();
+    const month = String(tomorrow.getMonth() + 1).padStart(2, '0');
+    const day = String(tomorrow.getDate()).padStart(2, '0');
+    
+    const dateStr1 = `${year}/${month}/${day}`;
+    const dateStr2 = `${year}-${month}-${day}`;
 
-    db.all("SELECT * FROM cargo WHERE arrival_date LIKE ?", [`%${tomorrowStr}%`], async (err, rows) => {
-        if (err || !rows || rows.length === 0) {
-            return res.status(404).json({ success: false, message: 'No customers found with tomorrow ETA.' });
+    const query = `
+        SELECT * FROM cargo 
+        WHERE arrival_date LIKE ? 
+           OR arrival_date LIKE ?
+    `;
+
+    db.all(query, [`%${dateStr1}%`, `%${dateStr2}%`], async (err, rows) => {
+        if (err) {
+            return res.status(500).json({ success: false, message: 'Database error.' });
+        }
+        
+        if (!rows || rows.length === 0) {
+            return res.json({ success: false, message: 'No customers found with tomorrow ETA.' });
         }
 
         let sentCount = 0;
@@ -363,7 +380,9 @@ app.post('/api/admin/send-bulk-whatsapp-tomorrow', async (req, res) => {
             }
         }
 
-        res.json({ success: true, message: `Successfully sent WhatsApp messages to ${sentCount} customers for tomorrow ETA!` });
+        res.json({ success: true, message: `Successfully sent WhatsApp messages to ${sentCount} customer(s) for tomorrow ETA!` });
+    });
+});
     });
 });
 
