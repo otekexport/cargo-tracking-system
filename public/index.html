@@ -855,14 +855,12 @@
 
                     ${timelineHtml}
 
-                    <!-- 📄 Official PDF Download Button -->
                     <div style="text-align: center; margin-top: 15px;">
                         <a href="/api/download-receipt/${encodeURIComponent(data.data.invoice_number)}" target="_blank" style="display: inline-flex; align-items: center; gap: 6px; background-color: #0284c7; color: white; padding: 10px 18px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 13px; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
                             📄 Download Official PDF Receipt
                         </a>
                     </div>
 
-                    <!-- ℹ️ Multi-Language Shipping Schedule Disclaimer Box -->
                     <div style="background-color: #f8f9fa; border-left: 4px solid #0284c7; border-radius: 8px; padding: 14px; margin-top: 18px; font-size: 12px; color: #334155; line-height: 1.6; text-align: left; box-sizing: border-box;">
                         <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; color: #0369a1; margin-bottom: 8px;">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
@@ -1191,7 +1189,7 @@
                     if(result.success) {
                         bulkMsg.style.color = "green";
                         bulkMsg.innerText = result.message;
-                        fileInput.value = "";
+                        fileInput.value, fileInput.value = "";
                     } else {
                         bulkMsg.style.color = "red";
                         bulkMsg.innerText = result.message || "Bulk update failed!";
