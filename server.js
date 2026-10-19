@@ -14,9 +14,9 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
-// 📊 Google Sheet URLs (Triple Sheets - Customer Sheet updated with export format & specific gid for Form Responses 1)
+// 📊 Google Sheet URLs (Triple Sheets - Customer Sheet with Form Responses 1 gid=757565291)
 const GOOGLE_SHEET_SHIPPING_URL = 'https://docs.google.com/spreadsheets/d/1iWvwlNWxX9LV5AssmlMw-wYeF09ILncXamjulrdihDQ/export?format=csv';
-const GOOGLE_SHEET_CUSTOMER_URL = 'https://docs.google.com/spreadsheets/d/165g39MP4HHIrMulhqM3Ot8isCrp5FP_0ZwtX8Aafg-A/export?format=csv&gid=0'; // Replace gid=0 if Form Responses 1 has a different gid
+const GOOGLE_SHEET_CUSTOMER_URL = 'https://docs.google.com/spreadsheets/d/165g39MP4HHIrMulhqM3Ot8isCrp5FP_0ZwtX8Aafg-A/export?format=csv&gid=757565291';
 const GOOGLE_SHEET_AMOUNT_URL = 'https://docs.google.com/spreadsheets/d/104cDSC0HcAr1S8zJQZhRITIdqNuBj1RUH9L1CYHOtJg/export?format=csv';
 
 // 🏢 Warehouse Short Code to Full Name Mapping
@@ -225,7 +225,7 @@ async function syncShippingSheet() {
 }
 
 async function syncCustomerSheet() {
-    console.log('🔄 Syncing Customer Details Sheet (Form Responses 1 - Columns O, W, Z, AH)...');
+    console.log('🔄 Syncing Customer Details Sheet (Form Responses 1 with gid=757565291)...');
     try {
         const response = await fetch(GOOGLE_SHEET_CUSTOMER_URL);
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
@@ -271,7 +271,7 @@ async function syncCustomerSheet() {
             db.run("COMMIT");
         });
 
-        console.log(`✅ Customer Sheet Synced: ${count} records processed from Form Responses 1.`);
+        console.log(`✅ Customer Sheet Synced: ${count} records processed with gid=757565291.`);
         return { success: true, count };
     } catch (err) {
         console.error("Customer Sheet Sync Failed:", err.message);
@@ -338,7 +338,7 @@ async function syncGoogleSheetData() {
     const res2 = await syncCustomerSheet();
     const res3 = await syncAmountSheet();
     if (res1.success || res2.success || res3.success) {
-        return { success: true, message: `Synced Shipping (${res1.count || 0}), Customer (${res2.count || 0}) & Amount (${res3.count || 0}) records successfully!` };
+        return { success: true, message: `Synced Shipping (${res1.count || 0}), Customer Form Responses (${res2.count || 0}) & Amount (${res3.count || 0}) records successfully!` };
     }
     return { success: false, message: 'Google sheets sync failed.' };
 }
@@ -671,6 +671,6 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`Server running securely on port ${PORT} with Form Responses 1 & Column K Amount Sync`);
+    console.log(`Server running securely on port ${PORT} with Instant Admin Prompt & Sheet Sync`);
     syncGoogleSheetData();
 });
