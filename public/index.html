@@ -23,12 +23,13 @@
     <script src="https://js.stripe.com/v3/"></script>
 
     <style>
-        html, body {
-            overflow-x: hidden;
+        /* Full smooth scrolling enabled for Mouse and Touch */
+        html {
             width: 100%;
-            position: relative;
-            touch-action: manipulation;
-            -webkit-text-size-adjust: 100%;
+            height: 100%;
+            overflow-x: hidden;
+            overflow-y: scroll;
+            scroll-behavior: smooth;
         }
 
         body { 
@@ -40,9 +41,9 @@
             justify-content: center;
             align-items: flex-start;
             background: linear-gradient(135deg, #05131f, #0b253a, #113856);
-            overflow-y: auto;
-            overscroll-behavior-y: none;
             box-sizing: border-box;
+            overflow-x: hidden;
+            overflow-y: auto;
         }
 
         #starCanvas {
@@ -65,9 +66,11 @@
             max-width: 950px;
             text-align: left; 
             margin-top: 10px;
-            margin-bottom: 20px;
+            margin-bottom: 30px;
             box-sizing: border-box;
             border: 1px solid rgba(255, 215, 0, 0.2);
+            position: relative;
+            z-index: 2;
         }
 
         .nav-buttons { 
@@ -1152,7 +1155,7 @@
                     const shipments = [];
 
                     for (let i = 1; i < lines.length; i++) {
-                        const line = lines[i].trim();
+                        const line = lines.line ? lines[i].trim() : lines[i].trim();
                         if (!line) continue;
                         
                         const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/^["']\vert{}["']$/g, ''));
