@@ -41,43 +41,23 @@ app.set('trust proxy', 1);
 
 app.use(helmet({
     contentSecurityPolicy: false,
-    strictTransportSecurity: {
-        maxAge: 31536000,
-        includeSubDomains: true,
-        preload: true
-    }
+    strictTransportSecurity: { maxAge: 31536000, includeSubDomains: true, preload: true }
 }));
 
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
-const generalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { success: false, message: 'Too many requests from this IP. Please try again after 15 minutes.' }
-});
-
-const adminLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 10,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { success: false, message: 'Too many admin authorization attempts. Try again after 15 minutes.' }
-});
+const generalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
+const adminLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10 });
 
 app.use('/api/', generalLimiter);
 app.use('/api/admin/', adminLimiter);
 app.use(express.static(path.join(__dirname, 'public')));
 
 const db = new sqlite3.Database('./cargo.db', (err) => {
-    if (err) {
-        console.error('Database connection error:', err.message);
-    } else {
-        console.log('Connected securely to SQLite database.');
-    }
+    if (err) console.error('Database connection error:', err.message);
+    else console.log('Connected securely to SQLite database.');
 });
 
 db.serialize(() => {
@@ -108,13 +88,11 @@ function checkAdminAuth(reqPassword) {
 
 async function sendWhatsAppAlert(customerPhone, customerName, invoiceNumber, status, arrivalDate) {
     if (!customerPhone) return;
-
     const cleanPhone = customerPhone.replace(/[^0-9]/g, '');
     if (cleanPhone.length < 9) return;
 
     const instanceId = process.env.ULTRAMSG_INSTANCE_ID;
     const token = process.env.ULTRAMSG_TOKEN;
-
     if (!instanceId || !token) return;
 
     const messageText = `Hello ${customerName || 'Valued Customer'},\n\n` +
@@ -168,7 +146,6 @@ async function syncShippingSheet() {
 
         const maxCols = Math.max(...rows.map(r => r.length));
         let count = 0;
-
         const query = `
             INSERT INTO cargo (invoice_number, shipping_date, arrival_date, clearing_warehouse, updated_at)
             VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
@@ -226,12 +203,10 @@ async function syncCustomerSheet() {
         db.serialize(() => {
             db.run("BEGIN TRANSACTION");
             const stmt = db.prepare(query);
-
             for (let r = 1; r < rows.length; r++) {
                 const row = rows[r];
                 const fullLineStr = row.join(' ');
 
-                // Smart Search to handle 8694 and column shifts
                 let inv = (row[14] !== undefined) ? row[14].trim() : '';
                 if (!inv || inv.length < 2) {
                     const invMatch = fullLineStr.match(/\b(INV-?[0-9]+|[0-9]{4,6})\b/i);
@@ -239,7 +214,6 @@ async function syncCustomerSheet() {
                 }
 
                 let name = (row[22] !== undefined) ? row[22].trim() : '';
-                
                 let phone = (row[25] !== undefined) ? row[25].trim() : '';
                 const phoneMatch = fullLineStr.match(/(\+?[0-9]{10,14})/);
                 if (phoneMatch && !phone) phone = phoneMatch[0];
@@ -252,7 +226,6 @@ async function syncCustomerSheet() {
                     count++;
                 }
             }
-
             stmt.finalize();
             db.run("COMMIT");
         });
@@ -283,7 +256,6 @@ async function syncAmountSheet() {
         db.serialize(() => {
             db.run("BEGIN TRANSACTION");
             const stmt = db.prepare(query);
-
             for (let r = 1; r < rows.length; r++) {
                 const row = rows[r];
                 const inv = (row[0] !== undefined) ? row[0].trim() : '';
@@ -294,7 +266,6 @@ async function syncAmountSheet() {
                     if (!isNaN(val)) amt = val;
                 }
 
-                // Column F (Index 5) for Full Price
                 let fullPrice = 0;
                 if (row[5] !== undefined) {
                     const valF = parseFloat(row[5].toString().replace(/[^0-9.-]+/g, ""));
@@ -307,7 +278,6 @@ async function syncAmountSheet() {
                     count++;
                 }
             }
-
             stmt.finalize();
             db.run("COMMIT");
         });
@@ -346,7 +316,6 @@ app.get('/api/track/:invoice', (req, res) => {
 app.post('/api/admin/sync-sheet', async (req, res) => {
     const { admin_password } = req.body;
     if (!checkAdminAuth(admin_password)) return res.status(401).json({ success: false, message: 'Invalid Admin Password!' });
-
     const result = await syncGoogleSheetData();
     res.json(result);
 });
@@ -389,19 +358,19 @@ app.post('/api/admin/update', (req, res) => {
 app.post('/api/admin/delete', (req, res) => {
     const { admin_password, invoice_number } = req.body;
     if (!checkAdminAuth(admin_password)) return res.status(401).json({ success: false, message: 'Invalid Admin Password!' });
-    if (!invoice_number) return res.status(400).json({ success: false, message: 'Invoice required.' });
+    if (!invoice_number) return res.status(400).json({ success: false, message: 'Invoice Number is required.' });
 
     db.run("DELETE FROM cargo WHERE invoice_number = ?", [invoice_number.trim()], function(err) {
         if (err) return res.status(500).json({ success: false, message: 'Failed to delete.' });
         if (this.changes === 0) return res.status(404).json({ success: false, message: 'Record not found.' });
-        res.json({ success: true, message: 'Deleted successfully!' });
+        res.json({ success: true, message: 'Invoice deleted successfully!' });
     });
 });
 
 app.post('/api/admin/bulk-update', (req, res) => {
     const { admin_password, shipments } = req.body;
     if (!checkAdminAuth(admin_password)) return res.status(401).json({ success: false, message: 'Invalid Admin Password!' });
-    if (!Array.isArray(shipments) || shipments.length === 0) return res.status(400).json({ success: false, message: 'No data.' });
+    if (!Array.isArray(shipments) || shipments.length === 0) return res.status(400).json({ success: false, message: 'No shipment data.' });
 
     const query = `
         INSERT INTO cargo (arrival_date, clearing_warehouse, invoice_number, customer_name, status, destination, amount, customer_phone, shipping_date, whatsapp_sent, updated_at)
@@ -435,7 +404,7 @@ app.post('/api/admin/bulk-update', (req, res) => {
         });
         stmt.finalize();
         db.run("COMMIT", (err) => {
-            if (err) return res.status(500).json({ success: false, message: 'Bulk update failed.' });
+            if (err) return res.status(500).json({ success: false, message: 'Bulk upload failed.' });
             res.json({ success: true, message: `Successfully updated ${count} records!` });
         });
     });
@@ -448,7 +417,60 @@ app.get('/api/admin/records', (req, res) => {
     });
 });
 
-// PDF Receipt Generator with Official Letterhead
+app.post('/create-checkout-session', (req, res) => {
+    const { trackingNumber, customerName, customerEmail, customAmount } = req.body;
+
+    if (!trackingNumber) {
+        return res.status(400).json({ error: 'Invoice number is required.' });
+    }
+
+    db.get("SELECT amount FROM cargo WHERE invoice_number = ?", [trackingNumber.trim()], async (err, row) => {
+        let baseAmount = 0;
+
+        if (row && parseFloat(row.amount) > 0) {
+            baseAmount = parseFloat(row.amount);
+        } else if (customAmount && parseFloat(customAmount) > 0) {
+            baseAmount = parseFloat(customAmount);
+        }
+
+        if (baseAmount <= 0) {
+            return res.status(400).json({ error: 'Valid invoice amount not found.' });
+        }
+
+        const cardFeeRate = 0.042;
+        const cardFee = Math.round(baseAmount * cardFeeRate);
+        const totalAmount = baseAmount + cardFee;
+
+        try {
+            const session = await stripe.checkout.sessions.create({
+                payment_method_types: ['card'],
+                line_items: [
+                    {
+                        price_data: {
+                            currency: 'jpy',
+                            product_data: {
+                                name: `Otek Export Freight Payment - ${trackingNumber.trim()}`,
+                                description: `Freight Amount: ¥${baseAmount.toLocaleString()} JPY | Fee: ¥${cardFee.toLocaleString()} JPY`,
+                            },
+                            unit_amount: totalAmount,
+                        },
+                        quantity: 1,
+                    },
+                ],
+                mode: 'payment',
+                customer_email: customerEmail || undefined,
+                success_url: `${req.protocol}://${req.get('host')}/payment.html?status=success&tracking=${encodeURIComponent(trackingNumber)}`,
+                cancel_url: `${req.protocol}://${req.get('host')}/payment.html?status=cancelled&tracking=${encodeURIComponent(trackingNumber)}`,
+            });
+
+            res.json({ url: session.url });
+        } catch (error) {
+            console.error("Stripe Checkout Error:", error);
+            res.status(500).json({ error: error.message });
+        }
+    });
+});
+
 app.get('/api/download-receipt/:invoice', (req, res) => {
     const invoice = req.params.invoice ? req.params.invoice.trim() : '';
     if (!invoice) return res.status(400).send('Invoice required.');
@@ -532,6 +554,6 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`Server running securely on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
     syncGoogleSheetData();
 });
