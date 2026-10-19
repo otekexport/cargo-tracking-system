@@ -299,7 +299,7 @@ async function syncGoogleSheetData() {
 
 cron.schedule('0 * * * *', () => { syncGoogleSheetData(); });
 
-// 📊 Admin: Heta ETA eka thiyana invoice list eka pennana API eka (Format: YYYY/MM/DD)
+// 📊 Admin: Heta ETA eka thiyana invoice list eka pennana API eka
 app.post('/api/admin/tomorrow-eta-list', (req, res) => {
     const { admin_password } = req.body;
     if (!checkAdminAuth(admin_password)) {
@@ -313,9 +313,8 @@ app.post('/api/admin/tomorrow-eta-list', (req, res) => {
     const month = String(tomorrow.getMonth() + 1).padStart(2, '0');
     const day = String(tomorrow.getDate()).padStart(2, '0');
     
-    // ඔබගේ ඩාටාබේස් එකේ ඇති ආකාරයට YYYY/MM/DD ආකෘතිය සකස් කර ගැනීම (උදා: 2026/10/22)
-    const targetDateStr = `${year}/${month}/${day}`;
-    const altDateStr = `${year}-${month}-${day}`; // විකල්පයක් ලෙස YYYY-MM-DD ද පරීක්ෂා කිරීමට
+    const dateStr1 = `${year}/${month}/${day}`;
+    const dateStr2 = `${year}-${month}-${day}`;
 
     const query = `
         SELECT * FROM cargo 
@@ -323,13 +322,12 @@ app.post('/api/admin/tomorrow-eta-list', (req, res) => {
            OR arrival_date LIKE ?
     `;
 
-    db.all(query, [`%${targetDateStr}%`, `%${altDateStr}%`], (err, rows) => {
+    db.all(query, [`%${dateStr1}%`, `%${dateStr2}%`], (err, rows) => {
         if (err) return res.status(500).json({ success: false, message: 'Database error.' });
-        res.json({ success: true, date: targetDateStr, data: rows || [] });
+        res.json({ success: true, date: dateStr1, data: rows || [] });
     });
 });
 
-// 📤 Admin: Heta ETA thiyana okkotama eka parata WhatsApp yawana API eka
 // 📤 Admin: Heta ETA thiyana okkotama eka parata WhatsApp yawana API eka (Fixed)
 app.post('/api/admin/send-bulk-whatsapp-tomorrow', async (req, res) => {
     const { admin_password } = req.body;
@@ -381,8 +379,6 @@ app.post('/api/admin/send-bulk-whatsapp-tomorrow', async (req, res) => {
         }
 
         res.json({ success: true, message: `Successfully sent WhatsApp messages to ${sentCount} customer(s) for tomorrow ETA!` });
-    });
-});
     });
 });
 
