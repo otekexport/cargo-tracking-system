@@ -128,7 +128,7 @@ async function sendWhatsAppAlert(customerPhone, customerName, invoiceNumber, sta
     const token = process.env.ULTRAMSG_TOKEN;
 
     if (!instanceId || !token) {
-        console.log("UltraMsg API credentials missing in environment variables.");
+        console.log("WhatsApp API credentials missing in environment variables.");
         return;
     }
 
@@ -236,9 +236,9 @@ async function syncShippingSheet() {
     }
 }
 
-// 🔄 Core Engine 2: Sync Customer Details Sheet
+// 🔄 Core Engine 2: Sync Customer Details Sheet (Exact Columns: O, W, Z, AH)
 async function syncCustomerSheet() {
-    console.log('🔄 Syncing Customer Details Google Sheet...');
+    console.log('🔄 Syncing Customer Details Google Sheet (Columns O, W, Z, AH)...');
     try {
         const response = await fetch(GOOGLE_SHEET_CUSTOMER_URL);
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
@@ -263,12 +263,16 @@ async function syncCustomerSheet() {
             db.run("BEGIN TRANSACTION");
             const stmt = db.prepare(query);
 
+            // Column O = Index 14 (Invoice Number)
+            // Column W = Index 22 (Customer Name)
+            // Column Z = Index 25 (Customer Phone)
+            // Column AH = Index 33 (Destination)
             for (let r = 1; r < rows.length; r++) {
                 const row = rows[r];
-                const inv = row[0] ? row[0].trim() : '';
-                const name = row[1] ? row[1].trim() : '';
-                const phone = row[2] ? row[2].trim() : '';
-                const dest = row[3] ? row[3].trim() : '';
+                const inv = (row[14] !== undefined && row[14] !== null) ? row[14].trim() : '';
+                const name = (row[22] !== undefined && row[22] !== null) ? row[22].trim() : '';
+                const phone = (row[25] !== undefined && row[25] !== null) ? row[25].trim() : '';
+                const dest = (row[33] !== undefined && row[33] !== null) ? row[33].trim() : '';
 
                 if (inv && inv !== '') {
                     stmt.run([inv, name, phone, dest]);
@@ -280,7 +284,7 @@ async function syncCustomerSheet() {
             db.run("COMMIT");
         });
 
-        console.log(`✅ Customer Sheet Synced: ${count} records processed.`);
+        console.log(`✅ Customer Sheet Synced: ${count} records processed from columns O, W, Z, AH.`);
         return { success: true, count };
     } catch (err) {
         console.error("Customer Sheet Sync Failed:", err.message);
