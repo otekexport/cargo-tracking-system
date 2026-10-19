@@ -14,9 +14,9 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
-// 📊 Google Sheet URLs (Triple Sheets)
+// 📊 Google Sheet URLs (Triple Sheets - Customer Sheet updated with export format & specific gid for Form Responses 1)
 const GOOGLE_SHEET_SHIPPING_URL = 'https://docs.google.com/spreadsheets/d/1iWvwlNWxX9LV5AssmlMw-wYeF09ILncXamjulrdihDQ/export?format=csv';
-const GOOGLE_SHEET_CUSTOMER_URL = 'https://docs.google.com/spreadsheets/d/165g39MP4HHIrMulhqM3Ot8isCrp5FP_0ZwtX8Aafg-A/export?format=csv';
+const GOOGLE_SHEET_CUSTOMER_URL = 'https://docs.google.com/spreadsheets/d/165g39MP4HHIrMulhqM3Ot8isCrp5FP_0ZwtX8Aafg-A/export?format=csv&gid=0'; // Replace gid=0 if Form Responses 1 has a different gid
 const GOOGLE_SHEET_AMOUNT_URL = 'https://docs.google.com/spreadsheets/d/104cDSC0HcAr1S8zJQZhRITIdqNuBj1RUH9L1CYHOtJg/export?format=csv';
 
 // 🏢 Warehouse Short Code to Full Name Mapping
@@ -28,7 +28,6 @@ const WAREHOUSE_MAP = {
     'SER': 'Ceylon Logistics Worldwide (Pvt) Ltd'
 };
 
-// Helper: Extract Warehouse Full Name
 function extractWarehouseName(shipDateStr, arrDateStr, warehouseStr) {
     const combined = ((shipDateStr || '') + ' ' + (arrDateStr || '') + ' ' + (warehouseStr || '')).toUpperCase();
     for (const [code, fullName] of Object.entries(WAREHOUSE_MAP)) {
@@ -39,10 +38,8 @@ function extractWarehouseName(shipDateStr, arrDateStr, warehouseStr) {
     return warehouseStr || '';
 }
 
-// 🛡️ Proxy Trust Configuration
 app.set('trust proxy', 1);
 
-// 🛡️ Security Headers
 app.use(helmet({
     contentSecurityPolicy: false,
     strictTransportSecurity: {
@@ -54,11 +51,9 @@ app.use(helmet({
 
 app.use(cors());
 
-// 🛡️ Request Limits
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
-// 🛡️ Rate Limiting
 const generalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 100,
@@ -78,10 +73,8 @@ const adminLimiter = rateLimit({
 app.use('/api/', generalLimiter);
 app.use('/api/admin/', adminLimiter);
 
-// Static Files
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Database Connection
 const db = new sqlite3.Database('./cargo.db', (err) => {
     if (err) {
         console.error('Database connection error:', err.message);
@@ -90,7 +83,6 @@ const db = new sqlite3.Database('./cargo.db', (err) => {
     }
 });
 
-// Database Table Schema Setup
 db.serialize(() => {
     db.run(`
         CREATE TABLE IF NOT EXISTS cargo (
@@ -111,13 +103,11 @@ db.serialize(() => {
     `);
 });
 
-// Helper: Secure Admin Auth Check
 function checkAdminAuth(reqPassword) {
     if (!ADMIN_PASSWORD) return false;
     return reqPassword === ADMIN_PASSWORD;
 }
 
-// 📲 Helper: Send WhatsApp Alert via UltraMsg API
 async function sendWhatsAppAlert(customerPhone, customerName, invoiceNumber, status, arrivalDate) {
     if (!customerPhone) return;
 
@@ -158,7 +148,6 @@ async function sendWhatsAppAlert(customerPhone, customerName, invoiceNumber, sta
     }
 }
 
-// 📊 Helper: Parse CSV Matrix
 function parseCSVMatrix(text) {
     const lines = text.split(/\r?\n/);
     return lines.map(line => {
@@ -181,7 +170,6 @@ function parseCSVMatrix(text) {
     });
 }
 
-// 🔄 Core Engine 1: Sync Shipping Sheet
 async function syncShippingSheet() {
     console.log('🔄 Syncing Shipping Google Sheet...');
     try {
@@ -236,9 +224,8 @@ async function syncShippingSheet() {
     }
 }
 
-// 🔄 Core Engine 2: Sync Customer Details Sheet (Exact Columns: O, W, Z, AH)
 async function syncCustomerSheet() {
-    console.log('🔄 Syncing Customer Details Google Sheet (Columns O, W, Z, AH)...');
+    console.log('🔄 Syncing Customer Details Sheet (Form Responses 1 - Columns O, W, Z, AH)...');
     try {
         const response = await fetch(GOOGLE_SHEET_CUSTOMER_URL);
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
@@ -263,9 +250,9 @@ async function syncCustomerSheet() {
             db.run("BEGIN TRANSACTION");
             const stmt = db.prepare(query);
 
-            // Column O = Index 14 (Invoice Number)
-            // Column W = Index 22 (Customer Name)
-            // Column Z = Index 25 (Customer Phone)
+            // Column O = Index 14 (Invoice)
+            // Column W = Index 22 (Name)
+            // Column Z = Index 25 (Phone)
             // Column AH = Index 33 (Destination)
             for (let r = 1; r < rows.length; r++) {
                 const row = rows[r];
@@ -284,7 +271,7 @@ async function syncCustomerSheet() {
             db.run("COMMIT");
         });
 
-        console.log(`✅ Customer Sheet Synced: ${count} records processed from columns O, W, Z, AH.`);
+        console.log(`✅ Customer Sheet Synced: ${count} records processed from Form Responses 1.`);
         return { success: true, count };
     } catch (err) {
         console.error("Customer Sheet Sync Failed:", err.message);
@@ -292,9 +279,8 @@ async function syncCustomerSheet() {
     }
 }
 
-// 🔄 Core Engine 3: Sync Have to Pay / Amount Sheet
 async function syncAmountSheet() {
-    console.log('🔄 Syncing Have to Pay / Amount Google Sheet...');
+    console.log('🔄 Syncing Have to Pay / Amount Google Sheet (Column K)...');
     try {
         const response = await fetch(GOOGLE_SHEET_AMOUNT_URL);
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
@@ -319,13 +305,13 @@ async function syncAmountSheet() {
 
             for (let r = 1; r < rows.length; r++) {
                 const row = rows[r];
-                const inv = row[0] ? row[0].trim() : '';
+                const inv = (row[0] !== undefined && row[0] !== null) ? row[0].trim() : '';
+                
                 let amt = 0;
-                for (let c = 1; c < row.length; c++) {
-                    const val = parseFloat(row[c].replace(/[^0-9.-]+/g, ""));
-                    if (!isNaN(val) && val > 0) {
+                if (row[10] !== undefined && row[10] !== null) {
+                    const val = parseFloat(row[10].toString().replace(/[^0-9.-]+/g, ""));
+                    if (!isNaN(val)) {
                         amt = val;
-                        break;
                     }
                 }
 
@@ -339,7 +325,7 @@ async function syncAmountSheet() {
             db.run("COMMIT");
         });
 
-        console.log(`✅ Amount Sheet Synced: ${count} records processed.`);
+        console.log(`✅ Amount Sheet Synced: ${count} records processed from Column K.`);
         return { success: true, count };
     } catch (err) {
         console.error("Amount Sheet Sync Failed:", err.message);
@@ -347,7 +333,6 @@ async function syncAmountSheet() {
     }
 }
 
-// Combined Triple Sync Function
 async function syncGoogleSheetData() {
     const res1 = await syncShippingSheet();
     const res2 = await syncCustomerSheet();
@@ -358,14 +343,11 @@ async function syncGoogleSheetData() {
     return { success: false, message: 'Google sheets sync failed.' };
 }
 
-// ⏰ Hourly Cron Job: Auto-Sync Google Sheets
 cron.schedule('0 * * * *', () => {
     syncGoogleSheetData();
 });
 
-// ⏰ Daily Cron Job: Send Arrival WhatsApp Alerts at 09:00 AM
 cron.schedule('0 9 * * *', () => {
-    console.log('⏰ Running daily WhatsApp arrival check...');
     const today = new Date();
     const isoToday = today.toISOString().split('T')[0];
     const formattedToday = today.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
@@ -387,7 +369,6 @@ cron.schedule('0 9 * * *', () => {
     });
 });
 
-// 📌 1. Track Cargo Endpoint
 app.get('/api/track/:invoice', (req, res) => {
     const invoice = req.params.invoice ? req.params.invoice.trim() : '';
     if (!invoice) {
@@ -412,7 +393,6 @@ app.get('/api/track/:invoice', (req, res) => {
     });
 });
 
-// 📌 2. Admin Manual Sync Google Sheet Endpoint
 app.post('/api/admin/sync-sheet', async (req, res) => {
     const { admin_password } = req.body;
     if (!checkAdminAuth(admin_password)) {
@@ -427,7 +407,6 @@ app.post('/api/admin/sync-sheet', async (req, res) => {
     }
 });
 
-// 📌 3. Admin Single Update Endpoint
 app.post('/api/admin/update', (req, res) => {
     const { admin_password, invoice_number, customer_name, customer_phone, shipping_date, arrival_date, clearing_warehouse, amount, status, destination } = req.body;
 
@@ -472,7 +451,6 @@ app.post('/api/admin/update', (req, res) => {
     });
 });
 
-// 📌 4. Admin Delete Endpoint
 app.post('/api/admin/delete', (req, res) => {
     const { admin_password, invoice_number } = req.body;
 
@@ -496,7 +474,6 @@ app.post('/api/admin/delete', (req, res) => {
     });
 });
 
-// 📌 5. Admin Bulk Update Endpoint (CSV Upload)
 app.post('/api/admin/bulk-update', (req, res) => {
     const { admin_password, shipments } = req.body;
 
@@ -558,7 +535,6 @@ app.post('/api/admin/bulk-update', (req, res) => {
     });
 });
 
-// 📌 6. Admin Records Fetch Endpoint
 app.get('/api/admin/records', (req, res) => {
     db.all("SELECT * FROM cargo ORDER BY updated_at DESC", [], (err, rows) => {
         if (err) {
@@ -569,7 +545,6 @@ app.get('/api/admin/records', (req, res) => {
     });
 });
 
-// 📌 7. Stripe Checkout Session
 app.post('/create-checkout-session', (req, res) => {
     const { trackingNumber, customerName, customerEmail, customAmount } = req.body;
 
@@ -624,7 +599,6 @@ app.post('/create-checkout-session', (req, res) => {
     });
 });
 
-// 📌 8. PDF Receipt Generator Endpoint
 app.get('/api/download-receipt/:invoice', (req, res) => {
     const invoice = req.params.invoice ? req.params.invoice.trim() : '';
     if (!invoice) {
@@ -649,7 +623,6 @@ app.get('/api/download-receipt/:invoice', (req, res) => {
 
         doc.pipe(res);
 
-        // Header / Branding
         doc.fillColor('#0284c7').fontSize(22).text('OTEK EXPORT', { align: 'center', bold: true });
         doc.fillColor('#475569').fontSize(10).text('Panorama Cargo Logistics (Pvt) Ltd', { align: 'center' });
         doc.moveDown(0.5);
@@ -659,7 +632,6 @@ app.get('/api/download-receipt/:invoice', (req, res) => {
         doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor('#cbd5e1').stroke();
         doc.moveDown(1);
 
-        // Shipment Details
         doc.fontSize(11).fillColor('#334155');
         doc.text(`Receipt Date: ${new Date().toLocaleDateString()}`);
         doc.text(`Invoice / Tracking No: ${row.invoice_number}`);
@@ -672,7 +644,6 @@ app.get('/api/download-receipt/:invoice', (req, res) => {
         doc.text(`Status: ${row.status || 'Pending'}`);
         doc.moveDown(1.5);
 
-        // Payment Details Breakdown
         doc.fillColor('#0369a1').fontSize(12).text('PAYMENT DETAILS BREAKDOWN', { bold: true });
         doc.moveDown(0.5);
 
@@ -700,6 +671,6 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`Server running securely on port ${PORT} with Stable UI & Triple Sync`);
+    console.log(`Server running securely on port ${PORT} with Form Responses 1 & Column K Amount Sync`);
     syncGoogleSheetData();
 });
