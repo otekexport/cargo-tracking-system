@@ -536,7 +536,7 @@
                 <h4 style="margin: 0 0 5px 0; color: #17a2b8;">View & Sync Database</h4>
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                     <button class="submit-btn view-page-btn" style="flex:1;" onclick="openRecordsPage()">📂 Open All Records Page</button>
-                    <button class="submit-btn sync-btn" style="flex:1;" onclick="syncGoogleSheetNow()">🔄 Sync Google Sheet Now</button>
+                    <button class="submit-btn sync-btn" style="flex:1;" onclick="syncGoogleSheetNow()">🔄 Sync Triple Google Sheets Now</button>
                 </div>
                 <div id="syncMsg"></div>
 
@@ -825,7 +825,7 @@
                         <div class="result-item"><strong>Invoice Number:</strong> ${data.data.invoice_number || '-'}</div>
                         <div class="result-item"><strong>Customer Name:</strong> ${data.data.customer_name || '-'}</div>
                         <div class="result-item"><strong>Customer Phone:</strong> ${data.data.customer_phone || '-'}</div>
-                        <div class="result-item"><strong>Base Invoice Amount:</strong> ¥${baseAmount.toLocaleString()} JPY</div>
+                        <div class="result-item"><strong>Base Invoice Amount (Have to Pay):</strong> ¥${baseAmount.toLocaleString()} JPY</div>
                         <div class="result-item"><strong>Status:</strong> ${data.data.status || '-'}</div>
                         <div class="result-item"><strong>Destination:</strong> ${data.data.destination || '-'}</div>
                     </div>
@@ -861,7 +861,7 @@
                         
                         <div style="background:white; padding:12px; border-radius:8px; border:1px solid #e9d5ff; margin-bottom:12px; font-size:13px; text-align:left;">
                             <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                                <span>Freight Charge:</span>
+                                <span>Freight Charge (Have to Pay):</span>
                                 <strong>¥${baseAmount.toLocaleString()}</strong>
                             </div>
                             <div style="display:flex; justify-content:space-between; margin-bottom:4px; color:#6b21a8;">
@@ -969,7 +969,7 @@
 
         function goToPaymentPage(invoiceNumber, customerName, baseAmount) {
             if (!baseAmount || baseAmount <= 0) {
-                return alert('මේ Invoice එක සඳහා ගෙවීමට අදාළ මුදල (Amount) තවමත් Admin විසින් ඇතුළත් කර නොමැත.');
+                return alert('මේ Invoice එක සඳහා ගෙවීමට අදාළ මුදල (Have to Pay) තවමත් Admin විසින් හෝ ෂීට් එකෙන් ඇතුළත් කර නොමැත.');
             }
             window.location.href = `/payment.html?tracking=${encodeURIComponent(invoiceNumber)}&amount=${baseAmount}&name=${encodeURIComponent(customerName)}`;
         }
@@ -1033,7 +1033,7 @@
         async function syncGoogleSheetNow() {
             const syncMsg = document.getElementById('syncMsg');
             syncMsg.style.color = "#0284c7";
-            syncMsg.innerText = "⏳ Syncing Google Sheet data...";
+            syncMsg.innerText = "⏳ Syncing Triple Google Sheets data...";
 
             try {
                 const res = await fetch('/api/admin/sync-sheet', {
@@ -1053,7 +1053,7 @@
                 }
             } catch (err) {
                 syncMsg.style.color = "red";
-                syncMsg.innerText = "Error syncing sheet: " + err.message;
+                syncMsg.innerText = "Error syncing sheets: " + err.message;
             }
         }
 
