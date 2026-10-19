@@ -548,13 +548,6 @@
         <div id="admin" class="tab-content">
             <h3 style="margin-top:0; color:#007bff; text-align: center;">Admin Panel</h3>
             
-            <div id="adminLoginForm">
-                <label>Admin Password:</label>
-                <input type="password" id="adminPassword" placeholder="Enter Password" onkeypress="if(event.key === 'Enter') verifyPassword()">
-                <button class="submit-btn admin-btn" onclick="verifyPassword()">Login to Admin</button>
-                <div id="loginMsg"></div>
-            </div>
-
             <div id="adminUpdateForm" style="display: none;">
                 <h4 style="margin: 0 0 5px 0; color: #17a2b8;">View & Sync Database</h4>
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
@@ -747,7 +740,7 @@
         createStars();
         drawStars();
 
-        let currentAdminPassword = "";
+        let currentAdminPassword = sessionStorage.getItem('adminPassword') || "";
 
         const WHATSAPP_NUMBER_1 = "94740784400";
         const WHATSAPP_NUMBER_2 = "94740304400";
@@ -761,6 +754,20 @@
             document.getElementById('btn-customer').classList.remove('active');
             document.getElementById('btn-payment').classList.remove('active');
             document.getElementById('btn-admin').classList.remove('active');
+
+            if (tabName === 'admin') {
+                if (!currentAdminPassword) {
+                    const enteredPass = prompt("🔐 Enter Admin Password to access Admin Panel:");
+                    if (!enteredPass) {
+                        // User cancelled or left empty, stay on customer tab
+                        switchTab('customer');
+                        return;
+                    }
+                    currentAdminPassword = enteredPass.trim();
+                    sessionStorage.setItem('adminPassword', currentAdminPassword);
+                }
+                document.getElementById('adminUpdateForm').style.display = 'block';
+            }
             
             document.getElementById(tabName).classList.add('active');
             document.getElementById('btn-' + tabName).classList.add('active');
@@ -1028,23 +1035,10 @@
             document.getElementById('policyModal').style.display = 'none';
         }
 
-        function verifyPassword() {
-            const pass = document.getElementById('adminPassword').value;
-            if(!pass) return alert('Please enter password');
-
-            currentAdminPassword = pass;
-            sessionStorage.setItem('adminPassword', pass);
-            document.getElementById('adminLoginForm').style.display = 'none';
-            document.getElementById('adminUpdateForm').style.display = 'block';
-            document.getElementById('loginMsg').innerText = '';
-        }
-
         function logoutAdmin() {
             currentAdminPassword = "";
             sessionStorage.removeItem('adminPassword');
-            document.getElementById('adminPassword').value = "";
-            document.getElementById('adminLoginForm').style.display = 'block';
-            document.getElementById('adminUpdateForm').style.display = 'none';
+            switchTab('customer');
         }
 
         function openRecordsPage() {
@@ -1070,7 +1064,9 @@
                 } else {
                     syncMsg.style.color = "red";
                     syncMsg.innerText = result.message || "Sync failed!";
-                    if (result.message === 'Invalid Admin Password!') logoutAdmin();
+                    if (result.message === 'Invalid Admin Password!') {
+                        logoutAdmin();
+                    }
                 }
             } catch (err) {
                 syncMsg.style.color = "red";
@@ -1108,7 +1104,9 @@
             } else {
                 msgDiv.style.color = "red";
                 msgDiv.innerText = result.message || "Error updating shipment!";
-                if(result.message === 'Invalid Admin Password!') logoutAdmin();
+                if(result.message === 'Invalid Admin Password!') {
+                    logoutAdmin();
+                }
             }
         }
 
@@ -1136,7 +1134,9 @@
             } else {
                 deleteMsg.style.color = "red";
                 deleteMsg.innerText = result.message || "Error deleting shipment!";
-                if(result.message === 'Invalid Admin Password!') logoutAdmin();
+                if(result.message === 'Invalid Admin Password!') {
+                    logoutAdmin();
+                }
             }
         }
 
@@ -1189,11 +1189,13 @@
                     if(result.success) {
                         bulkMsg.style.color = "green";
                         bulkMsg.innerText = result.message;
-                        fileInput.value, fileInput.value = "";
+                        fileInput.value = "";
                     } else {
                         bulkMsg.style.color = "red";
                         bulkMsg.innerText = result.message || "Bulk update failed!";
-                        if(result.message === 'Invalid Admin Password!') logoutAdmin();
+                        if(result.message === 'Invalid Admin Password!') {
+                            logoutAdmin();
+                        }
                     }
                 } catch (err) {
                     alert('CSV file read error: ' + err.message);
