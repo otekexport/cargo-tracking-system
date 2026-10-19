@@ -299,8 +299,7 @@ async function syncGoogleSheetData() {
 
 cron.schedule('0 * * * *', () => { syncGoogleSheetData(); });
 
-// 📊 Admin: Heta ETA eka thiyana invoice list eka pennana API eka
-// 📊 Admin: Heta ETA eka thiyana invoice list eka pennana API eka (Flexible Date Matching)
+// 📊 Admin: Heta ETA eka thiyana invoice list eka pennana API eka (Format: YYYY/MM/DD)
 app.post('/api/admin/tomorrow-eta-list', (req, res) => {
     const { admin_password } = req.body;
     if (!checkAdminAuth(admin_password)) {
@@ -310,25 +309,23 @@ app.post('/api/admin/tomorrow-eta-list', (req, res) => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     
-    // විවිධ ක්‍රමවලට දිනය සෙවීම සඳහා Formats සකස් කර ගැනීම (YYYY-MM-DD, DD/MM/YYYY, ආදී ලෙස)
     const year = tomorrow.getFullYear();
     const month = String(tomorrow.getMonth() + 1).padStart(2, '0');
     const day = String(tomorrow.getDate()).padStart(2, '0');
     
-    const isoDateStr = `${year}-${month}-${day}`; // 2026-10-20
-    const altDateStr1 = `${day}/${month}/${year}`; // 20/10/2026
-    const altDateStr2 = `${month}/${day}/${year}`; // 10/20/2026
+    // ඔබගේ ඩාටාබේස් එකේ ඇති ආකාරයට YYYY/MM/DD ආකෘතිය සකස් කර ගැනීම (උදා: 2026/10/22)
+    const targetDateStr = `${year}/${month}/${day}`;
+    const altDateStr = `${year}-${month}-${day}`; // විකල්පයක් ලෙස YYYY-MM-DD ද පරීක්ෂා කිරීමට
 
     const query = `
         SELECT * FROM cargo 
         WHERE arrival_date LIKE ? 
-           OR arrival_date LIKE ? 
            OR arrival_date LIKE ?
     `;
 
-    db.all(query, [`%${isoDateStr}%`, `%${altDateStr1}%`, `%${altDateStr2}%`], (err, rows) => {
+    db.all(query, [`%${targetDateStr}%`, `%${altDateStr}%`], (err, rows) => {
         if (err) return res.status(500).json({ success: false, message: 'Database error.' });
-        res.json({ success: true, date: isoDateStr, data: rows || [] });
+        res.json({ success: true, date: targetDateStr, data: rows || [] });
     });
 });
 
