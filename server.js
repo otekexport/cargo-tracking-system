@@ -299,6 +299,27 @@ async function syncGoogleSheetData() {
 
 cron.schedule('0 * * * *', () => { syncGoogleSheetData(); });
 
+// 🕒 සෑම දිනකම උදෑසන 8:00 ට අද දිනට (ETA) භාණ්ඩ පැමිණීමට ඇති සියලුම පාරිභෝගිකයින්ට ස්වයංක්‍රීයව WhatsApp පණිවිඩයක් යැවීම
+cron.schedule('0 8 * * *', () => {
+    const todayStr = new Date().toISOString().split('T')[0]; // වර්තමාන දිනය (YYYY-MM-DD)
+    
+    db.all("SELECT * FROM cargo WHERE arrival_date LIKE ?", [`%${todayStr}%`], (err, rows) => {
+        if (err || !rows) return;
+
+        rows.forEach(row => {
+            if (row.customer_phone) {
+                sendWhatsAppAlert(
+                    row.customer_phone, 
+                    row.customer_name, 
+                    row.invoice_number, 
+                    "Arriving Today at " + (row.clearing_warehouse || 'Warehouse'), 
+                    row.arrival_date
+                );
+            }
+        });
+    });
+});
+
 app.get('/api/track/:invoice', (req, res) => {
     const invoice = req.params.invoice ? req.params.invoice.trim() : '';
     if (!invoice) return res.status(400).json({ success: false, message: 'Invoice number is required.' });
