@@ -215,22 +215,22 @@ async function syncCustomerSheet() {
             db.run("BEGIN TRANSACTION");
             const stmt = db.prepare(query);
             for (let r = 1; r < rows.length; r++) {
-                const row = rows[r];
+                const row = rows[r] || [];
                 const fullLineStr = row.join(' ');
 
-                let inv = (row[14] !== undefined) ? row[14].trim() : '';
-                if (!inv || inv.length < 2) {
-                    const invMatch = fullLineStr.match(/\b(INV-?[0-9]+|[0-9]{4,6})\b/i);
-                    if (invMatch) inv = invMatch[0];
-                }
+                // 1. පේළියෙන් Invoice Number එක සොයා ගැනීම
+                const invMatch = fullLineStr.match(/\b(INV-?[0-9]+|[0-9]{4,6})\b/i);
+                if (!invMatch) continue;
+                let inv = invMatch[0].trim();
 
-                let name = (row[22] !== undefined) ? row[22].trim() : '';
-                let phone = (row[25] !== undefined) ? row[25].trim() : '';
+                // 2. දුරකථන අංකය සොයා ගැනීම
+                let phone = '';
                 const phoneMatch = fullLineStr.match(/(\+?[0-9]{10,14})/);
-                if (phoneMatch && !phone) phone = phoneMatch[0];
-                phone = phone.replace(/[^0-9]/g, '');
+                if (phoneMatch) phone = phoneMatch[0].replace(/[^0-9]/g, '');
 
-                let dest = (row[33] !== undefined) ? row[33].trim() : '';
+                // 3. නම සහ Destination එක නිසි පරිදි ලබා ගැනීම
+                let name = row[22] ? row[22].trim() : (row[1] ? row[1].trim() : '');
+                let dest = row[33] ? row[33].trim() : (row[2] ? row[2].trim() : '');
 
                 if (inv && inv !== '') {
                     stmt.run([inv, name, phone, dest]);
@@ -245,7 +245,6 @@ async function syncCustomerSheet() {
         return { success: false, error: err.message };
     }
 }
-
 async function syncAmountSheet() {
     try {
         const response = await fetch(GOOGLE_SHEET_AMOUNT_URL);
