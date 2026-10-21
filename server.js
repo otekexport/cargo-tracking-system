@@ -16,7 +16,7 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 // 📊 Google Sheet URLs
 const GOOGLE_SHEET_SHIPPING_URL = 'https://docs.google.com/spreadsheets/d/1iWvwlNWxX9LV5AssmlMw-wYeF09ILncXamjulrdihDQ/export?format=csv';
-const GOOGLE_SHEET_CUSTOMER_URL = 'https://docs.google.com/spreadsheets/d/165g39MP4HHIrMulhqM3Ot8isCrp5FP_0ZwtX8Aafg-A/export?format=csv&gid=757565291';
+const GOOGLE_SHEET_CUSTOMER_URL = 'https://docs.google.com/spreadsheets/d/165g39MP4HHIrMulhqM3Ot8isCrp5FP_0ZwtX8Aafg-A/export?format=csv&gid=1275767839';
 const GOOGLE_SHEET_AMOUNT_URL = 'https://docs.google.com/spreadsheets/d/104cDSC0HcAr1S8zJQZhRITIdqNuBj1RUH9L1CYHOtJg/export?format=csv';
 
 const WAREHOUSE_MAP = {
@@ -216,121 +216,28 @@ async function syncCustomerSheet() {
             db.run("BEGIN TRANSACTION");
             const stmt = db.prepare(query);
             
+            // පළමු පේළිය (Headers) මඟ හැර දෙවන පේළියේ සිට කියවීම
             for (let r = 1; r < lines.length; r++) {
                 const line = lines[r].trim();
                 if (!line) continue;
 
                 const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/^["']\vert{}["']$/g, ''));
-                if (cols.length === 0) continue;
+                if (cols.length < 2) continue;
 
-                const fullLineStr = cols.join(' ');
+                // ෂීට් එකේ කොලම් පිළිවෙළ අනුව දත්ත ලබා ගැනීම:
+                // cols[0] = Invoice Number
+                // cols[1] = Customer Name (නම)
+                // cols[2] = Phone Number (දුරකථන අංකය)
+                // cols[3] = Destination (ගමනාන්තය)
+                const inv = cols[0] ? cols[0].trim() : '';
+                const name = cols[1] ? cols[1].trim() : '';
+                const rawPhone = cols[2] ? cols[2].trim() : '';
+                const dest = cols[3] ? cols[3].trim() : '';
 
-                // 1. පේළියේ ඕනෑම තැනකින් Invoice Number එක සොයා ගැනීම
-                let inv = '';
-                const invMatch = fullLineStr.match(/\b(INV-?[0-9]+|[0-9]{4,6})\b/i);
-                if (invMatch) {
-                    inv = invMatch[0].trim();
-                } else {
-                    // පළමු කොලම් කිහිපයෙන් එකක් ඉන්වොයිස් එක විය හැක
-                    for (let i = 0; i < Math.min(cols.length, 15); i++) {
-                        if (cols[i] && (cols[i].match(/^INV/i) || cols[i].match(/^[0-9]{4,6}$/))) {
-                            inv = cols[i].trim();
-                            break;
-                        }
-                    }
-                }
-                if (!inv) continue;
-
-                let name = '';
-                let phone = '';
-                let dest = '';
-
-                // 2. පේළියේ ඇති සෑම කොලම් එකක්ම එකින් එක පරීක්ෂා කිරීම
-                for (let i = 0; i < cols.length; i++) {
-                    const val = cols[i] ? cols[i].trim() : '';
-                    if (!val) continue;
-
-                    // දුරකථන අංකය සෙවීම (ඉලක්කම් 9 ත් 14 ත් අතර)
-                    const cleanNum = val.replace(/[^0-9]/g, '');
-                    if (!phone && cleanNum.length >= 9 && cleanNum.length <= 14) {
-                        phone = cleanNum;
-                        continue;
-                    }
-
-                    // ගමනාන්තය (Destination) සෙවීම
-                    const lowerVal = val.toLowerCase();
-                    if (!dest && (lowerVal.includes('colombo') || lowerVal.includes('kandy') || lowerVal.includes('galle') || lowerVal.includes('jaffna') || lowerVal.includes('negombo') || lowerVal.includes('gampaha') || lowerVal.includes('kurunegala') || lowerVal.includes('matara'))) {
-                        dest = val;
-                        continue;
-                    }
-
-                    // නම (Shipper Name) සෙවීම (අංක නොවන, දිගු පෙළක් වන අවස්ථා - Index 10 ට වැඩි සහ URL නොවන)
-                    if (!name && i >= 10 && val.length > 3 && !val.match(/^[0-9]+$/) && !lowerVal.includes('http') && !lowerVal.includes('inv') && !lowerVal.includes('@')) {
-                        name = val;
-                    }
-                }
-
-                // 3. සාමාන්‍ය වැදගත් කොලම් වලින්ද පරීක්ෂා කර බැලීම (W, Z, AH ආසන්න අගයන්)
-                if (!name && cols[22]) name = cols[22].trim();
-                if (!name && cols[23]) name = cols[23].trim();
-                if (!phone && cols[25]) phone = cols[25].replace(/[^0-9]/g, '');
-                if (!phone && cols[26]) phone = cols[26].replace(/[^0-9]/g, '');
-                if (!dest && cols[33]) dest = cols[33].trim();
-                if (!dest && cols[34]) dest = cols[34].trim();
+                const phone = rawPhone ? rawPhone.replace(/[^0-9]/g, '') : '';
 
                 if (inv && inv !== '') {
                     stmt.run([inv, name, phone, dest]);
-                    count++;
-                }
-            }
-            stmt.finalize();
-            db.run("COMMIT");
-        });
-        return { success: true, count };
-    } catch (err) {
-        return { success: false, error: err.message };
-    }
-}
-async function syncAmountSheet() {
-    try {
-        const response = await fetch(GOOGLE_SHEET_AMOUNT_URL);
-        if (!response.ok) return { success: false };
-        const csvText = await response.text();
-        const rows = parseCSVMatrix(csvText);
-        if (rows.length < 2) return { success: false };
-
-        let count = 0;
-        const query = `
-            INSERT INTO cargo (invoice_number, amount, full_price, updated_at)
-            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT(invoice_number) DO UPDATE SET
-                amount = CASE WHEN excluded.amount > 0 THEN excluded.amount ELSE cargo.amount END,
-                full_price = CASE WHEN excluded.full_price > 0 THEN excluded.full_price ELSE cargo.full_price END,
-                updated_at = CURRENT_TIMESTAMP
-        `;
-
-        db.serialize(() => {
-            db.run("BEGIN TRANSACTION");
-            const stmt = db.prepare(query);
-            for (let r = 1; r < rows.length; r++) {
-                const row = rows[r];
-                const inv = (row[0] !== undefined) ? row[0].trim() : '';
-                
-                let amt = 0;
-                if (row[10] !== undefined) {
-                    const val = parseFloat(row[10].toString().replace(/[^0-9.-]+/g, ""));
-                    if (!isNaN(val)) amt = val;
-                }
-
-                let fullPrice = 0;
-                if (row[5] !== undefined) {
-                    const valF = parseFloat(row[5].toString().replace(/[^0-9.-]+/g, ""));
-                    if (!isNaN(valF)) fullPrice = valF;
-                }
-                if (fullPrice === 0 && amt > 0) fullPrice = amt;
-
-                if (inv && inv !== '') {
-                    stmt.run([inv, amt, fullPrice]);
                     count++;
                 }
             }
