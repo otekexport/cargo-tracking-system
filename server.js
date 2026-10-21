@@ -198,7 +198,6 @@ async function syncCustomerSheet() {
         if (!response.ok) return { success: false };
         const csvText = await response.text();
         
-        // CSV lines walata kadaganna
         const lines = csvText.split(/\r?\n/);
         if (lines.length < 2) return { success: false };
 
@@ -221,11 +220,11 @@ async function syncCustomerSheet() {
                 const line = lines[r].trim();
                 if (!line) continue;
 
-                // CSV row eka columns walata ven karaganna (Quotes athule commas thibunath handle karanna)
+                // CSV row එක columns වලට වෙන් කර ගැනීම
                 const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/^["']\vert{}["']$/g, ''));
                 if (cols.length === 0) continue;
 
-                // 1. Invoice Number eka hoyaganna (Row eke kohe thibunath regex match karala)
+                // 1. Invoice Number එක සොයා ගැනීම
                 let inv = '';
                 const fullLineStr = cols.join(' ');
                 const invMatch = fullLineStr.match(/\b(INV-?[0-9]+|[0-9]{4,6})\b/i);
@@ -233,17 +232,15 @@ async function syncCustomerSheet() {
                 if (!inv && cols[14]) inv = cols[14].trim();
                 if (!inv) continue;
 
-                // 2. Column W (Index 22) - Shipper Name
+                // 2. Column W (Index 22) - Shipper Name (නම සඳහා)
                 let name = '';
                 if (cols[22] && cols[22].trim() !== '') {
                     name = cols[22].trim();
                 } else if (cols[23] && cols[23].trim() !== '') {
                     name = cols[23].trim();
-                } else if (cols[21] && cols[21].trim() !== '') {
-                    name = cols[21].trim();
                 }
 
-                // 3. Column Z (Index 25) - Phone Number
+                // 3. Column Z (Index 25) - Phone Number (දුරකථන අංකය සඳහා)
                 let phone = '';
                 let rawPhone = '';
                 if (cols[25] && cols[25].trim() !== '') {
@@ -258,7 +255,7 @@ async function syncCustomerSheet() {
                     phone = rawPhone.replace(/[^0-9]/g, '');
                 }
 
-                // 4. Column AH (Index 33) - Destination
+                // 4. Column AH (Index 33) - Destination (ගමනාන්තය සඳහා)
                 let dest = '';
                 if (cols[33] && cols[33].trim() !== '') {
                     dest = cols[33].trim();
