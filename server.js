@@ -201,24 +201,6 @@ async function syncCustomerSheet() {
         const lines = csvText.split(/\r?\n/);
         if (lines.length < 2) return { success: false };
 
-        // 1. මුල් පේළිය (Header Row) පරීක්ෂා කර W (Index 22), Z (Index 25), AH (Index 33) හෝ අදාළ කොලම් අංක හොයාගැනීම
-        const headerCols = lines[0].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/^["']\vert{}["']$/g, '').toLowerCase());
-        
-        let invIdx = -1;
-        let nameIdx = 22; // Default W index
-        let phoneIdx = 25; // Default Z index
-        let destIdx = 33; // Default AH index
-
-        // Header එකෙන් නිවැරදි කොලම් ඉන්ඩෙක්ස් සොයා ගැනීම
-        headerCols.forEach((col, idx) => {
-            if (col.includes('invoice') || col.includes('inv')) invIdx = idx;
-            if (col.includes('shipper') || col.includes('name')) {
-                if (nameIdx === 22) nameIdx = idx; // මුල්ම නම හෝ Shipper එක ගන්න
-            }
-            if (col.includes('phone') || col.includes('mobile') || col.includes('tel')) phoneIdx = idx;
-            if (col.includes('destination') || col.includes('dest') || col.includes('address')) destIdx = idx;
-        });
-
         let count = 0;
         const query = `
             INSERT INTO cargo (invoice_number, customer_name, customer_phone, destination, updated_at)
@@ -243,54 +225,49 @@ async function syncCustomerSheet() {
 
                 const fullLineStr = cols.join(' ');
 
-                // Invoice Number එක සොයා ගැනීම
+                // 1. Invoice Number එක සොයා ගැනීම
                 let inv = '';
-                if (invIdx !== -1 && cols[invIdx]) {
-                    inv = cols[invIdx].trim();
-                }
-                if (!inv) {
-                    const invMatch = fullLineStr.match(/\b(INV-?[0-9]+|[0-9]{4,6})\b/i);
-                    if (invMatch) inv = invMatch[0].trim();
-                }
+                const invMatch = fullLineStr.match(/\b(INV-?[0-9]+|[0-9]{4,6})\b/i);
+                if (invMatch) inv = invMatch[0].trim();
                 if (!inv && cols[14]) inv = cols[14].trim();
                 if (!inv) continue;
 
-                // Name (Shipper Name - Column W අසල හෝ Header එකෙන් හොයාගත් Index එක)
                 let name = '';
-                if (cols[nameIdx] && cols[nameIdx].trim() !== '') {
-                    name = cols[nameIdx].trim();
-                } else if (cols[22] && cols[22].trim() !== '') {
-                    name = cols[22].trim();
-                } else if (cols[23] && cols[23].trim() !== '') {
-                    name = cols[23].trim();
-                }
-
-                // Phone Number (Column Z අසල හෝ Header එකෙන් හොයාගත් Index එක)
                 let phone = '';
-                let rawPhone = '';
-                if (cols[phoneIdx] && cols[phoneIdx].trim() !== '') {
-                    rawPhone = cols[phoneIdx];
-                } else if (cols[25] && cols[25].trim() !== '') {
-                    rawPhone = cols[25];
-                } else if (cols[26] && cols[26].trim() !== '') {
-                    rawPhone = cols[26];
-                } else {
-                    const phoneMatch = fullLineStr.match(/(\+?[0-9]{10,14})/);
-                    if (phoneMatch) rawPhone = phoneMatch[0];
-                }
-                if (rawPhone) {
-                    phone = rawPhone.replace(/[^0-9]/g, '');
+                let dest = '';
+
+                // 2. පේළියේ ඇති සෑම කොලම් එකක්ම පරීක්ෂා කර අදාළ දත්ත වර්ගය අනුව අල්ලා ගැනීම
+                for (let i = 0; i < cols.length; i++) {
+                    const val = cols[i] ? cols[i].trim() : '';
+                    if (!val) continue;
+
+                    // දුරකථන අංකයක්දැයි පරීක්ෂා කිරීම (ඉලක්කම් 9 සිට 14 வரை)
+                    const cleanNum = val.replace(/[^0-9]/g, '');
+                    if (!phone && cleanNum.length >= 9 && cleanNum.length <= 14 && (val.includes('+') || cleanNum.length >= 10)) {
+                        phone = cleanNum;
+                        continue;
+                    }
+
+                    // ගමනාන්තයක් (Destination) දැයි පරීක්ෂා කිරීම (ከተማක නමක් හෝ දන්නා වචන)
+                    const lowerVal = val.toLowerCase();
+                    if (!dest && (lowerVal.includes('colombo') || lowerVal.includes('kandy') || lowerVal.includes('galle') || lowerVal.includes('jaffna') || lowerVal.includes('negombo') || lowerVal.includes('kurunegala') || lowerVal.includes('matara'))) {
+                        dest = val;
+                        continue;
+                    }
+
+                    // නමක් (Shipper Name) දැයි පරීක්ෂා කිරීම (අංක නොවූ, දිගින් වැඩි පෙළක් වීම)
+                    if (!name && i >= 15 && i <= 30 && val.length > 2 && !val.match(/^[0-9]+$/) && !lowerVal.includes('http') && !lowerVal.includes('inv')) {
+                        name = val;
+                    }
                 }
 
-                // Destination (Column AH අසල හෝ Header එකෙන් හොයාගත් Index එක)
-                let dest = '';
-                if (cols[destIdx] && cols[destIdx].trim() !== '') {
-                    dest = cols[destIdx].trim();
-                } else if (cols[33] && cols[33].trim() !== '') {
-                    dest = cols[33].trim();
-                } else if (cols[34] && cols[34].trim() !== '') {
-                    dest = cols[34].trim();
-                }
+                // විශේෂ වැදගත්: ඔබ සඳහන් කළ W (Index 22), Z (Index 25), AH (Index 33) වල නිශ්චිත අගයන්ද බලන්න
+                if (!name && cols[22]) name = cols[22].trim();
+                if (!name && cols[23]) name = cols[23].trim();
+                if (!phone && cols[25]) phone = cols[25].replace(/[^0-9]/g, '');
+                if (!phone && cols[26]) phone = cols[26].replace(/[^0-9]/g, '');
+                if (!dest && cols[33]) dest = cols[33].trim();
+                if (!dest && cols[34]) dest = cols[34].trim();
 
                 if (inv && inv !== '') {
                     stmt.run([inv, name, phone, dest]);
