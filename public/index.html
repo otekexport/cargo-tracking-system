@@ -754,13 +754,44 @@
         createStars();
         drawStars();
 
-        let currentAdminPassword = sessionStorage.getItem('adminPassword') || "";
+let currentAdminPassword = sessionStorage.getItem('adminPassword') || "";
 
         const WHATSAPP_NUMBER_1 = "94740784400";
         const WHATSAPP_NUMBER_2 = "94740304400";
         const WHATSAPP_NUMBER_3 = "94740104400";
 
-        function switchTab(tabName) {
+        async function verifyAndSetPassword() {
+            const enteredPass = prompt("🔐 Enter Admin Password to access Admin Panel:");
+            if (!enteredPass) {
+                return false;
+            }
+            const testPass = enteredPass.trim();
+            
+            // සර්වර් එකට පරීක්ෂා කිරීම සඳහා රික්වෙස්ට් එකක් යැවීම
+            try {
+                const res = await fetch('/api/admin/tomorrow-eta-list', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ admin_password: testPass })
+                });
+                const result = await res.json();
+                
+                if (result.success) {
+                    currentAdminPassword = testPass;
+                    sessionStorage.setItem('adminPassword', currentAdminPassword);
+                    return true;
+                } else {
+                    alert("❌ Invalid Password! Please try again.");
+                    sessionStorage.removeItem('adminPassword');
+                    return false;
+                }
+            } catch (err) {
+                alert("Connection error verifying password.");
+                return false;
+            }
+        }
+
+        async function switchTab(tabName) {
             document.getElementById('customer').classList.remove('active');
             document.getElementById('payment').classList.remove('active');
             document.getElementById('admin').classList.remove('active');
@@ -770,14 +801,34 @@
             document.getElementById('btn-admin').classList.remove('active');
 
             if (tabName === 'admin') {
-                if (!currentAdminPassword) {
-                    const enteredPass = prompt("🔐 Enter Admin Password to access Admin Panel:");
-                    if (!enteredPass) {
+                // මුලින්ම පාස්වර්ඩ් එක නැතහොත් හෝ වැරදි නම් නැවත විමසීම
+                let isAuthorized = false;
+                if (currentAdminPassword) {
+                    // කලින් සේව් වී ඇති පාස්වර්ඩ් එක නිවැරදිදැයි චෙක් කිරීම
+                    try {
+                        const res = await fetch('/api/admin/tomorrow-eta-list', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ admin_password: currentAdminPassword })
+                        });
+                        const result = await res.json();
+                        if (result.success) {
+                            isAuthorized = true;
+                        } else {
+                            sessionStorage.removeItem('adminPassword');
+                            currentAdminPassword = "";
+                        }
+                    } catch (e) {
+                        isAuthorized = false;
+                    }
+                }
+
+                if (!isAuthorized) {
+                    const success = await verifyAndSetPassword();
+                    if (!success) {
                         switchTab('customer');
                         return;
                     }
-                    currentAdminPassword = enteredPass.trim();
-                    sessionStorage.setItem('adminPassword', currentAdminPassword);
                 }
                 document.getElementById('adminUpdateForm').style.display = 'block';
             }
