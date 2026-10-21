@@ -613,8 +613,8 @@ app.get('/api/download-receipt/:invoice', (req, res) => {
         doc.moveDown(0.4);
 
         doc.fontSize(10).fillColor('#0f172a');
-        doc.text(`Full Invoice Price (මුළු වටිනාකම): ¥ ${fullPrice.toLocaleString()} JPY`);
-        doc.text(`Have to Pay (ගෙවිය යුතු ශේෂය): ¥ ${baseAmount.toLocaleString()} JPY`);
+        doc.text(`Full Invoice Price: ¥ ${fullPrice.toLocaleString()} JPY`);
+        doc.text(`Have to Pay: ¥ ${baseAmount.toLocaleString()} JPY`);
         doc.text(`Card Processing & Service Fee (4.2%): ¥ ${cardFee.toLocaleString()} JPY`);
         
         doc.moveDown(0.5);
