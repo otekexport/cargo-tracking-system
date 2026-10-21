@@ -206,9 +206,9 @@ async function syncCustomerSheet() {
             INSERT INTO cargo (invoice_number, customer_name, customer_phone, destination, updated_at)
             VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
             ON CONFLICT(invoice_number) DO UPDATE SET
-                customer_name = COALESCE(NULLIF(cargo.customer_name, ''), excluded.customer_name),
-                customer_phone = COALESCE(NULLIF(cargo.customer_phone, ''), excluded.customer_phone),
-                destination = COALESCE(NULLIF(cargo.destination, ''), excluded.destination),
+                customer_name = CASE WHEN excluded.customer_name != '' THEN excluded.customer_name ELSE cargo.customer_name END,
+                customer_phone = CASE WHEN excluded.customer_phone != '' THEN excluded.customer_phone ELSE cargo.customer_phone END,
+                destination = CASE WHEN excluded.destination != '' THEN excluded.destination ELSE cargo.destination END,
                 updated_at = CURRENT_TIMESTAMP
         `;
 
@@ -220,63 +220,55 @@ async function syncCustomerSheet() {
                 const line = lines[r].trim();
                 if (!line) continue;
 
+                // CSV පේළිය නිවැරදිව කොටස් වලට වෙන් කර ගැනීම
                 const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/^["']\vert{}["']$/g, ''));
                 if (cols.length === 0) continue;
 
                 const fullLineStr = cols.join(' ');
 
-                // 1. Invoice Number එක සොයා ගැනීම
+                // 1. Invoice Number එක සොයා ගැනීම (Regex මඟින් පේළියේ ඕනෑම තැනකින්)
                 let inv = '';
                 const invMatch = fullLineStr.match(/\b(INV-?[0-9]+|[0-9]{4,6})\b/i);
                 if (invMatch) inv = invMatch[0].trim();
                 if (!inv && cols[14]) inv = cols[14].trim();
                 if (!inv) continue;
 
-                // 2. Column W (Index 22 හෝ 23) හෝ පේළියේ වෙනත් තැනක ඇති නම
                 let name = '';
+                let phone = '';
+                let dest = '';
+
+                // 2. ඔබ සඳහන් කළ W (Index 22 හෝ 23) සහ Z (Index 25), AH (Index 33) වලින් මුලින්ම උත්සාහ කිරීම
                 if (cols[22] && cols[22].trim()) name = cols[22].trim();
                 else if (cols[23] && cols[23].trim()) name = cols[23].trim();
-                else if (cols[21] && cols[21].trim()) name = cols[21].trim();
 
-                // 3. Column Z (Index 25 හෝ 26) හෝ පේළියේ ඇති දුරකථන අංකය
-                let phone = '';
-                let rawPhone = '';
-                if (cols[25] && cols[25].trim()) rawPhone = cols[25];
-                else if (cols[26] && cols[26].trim()) rawPhone = cols[26];
-                else {
-                    const phoneMatch = fullLineStr.match(/(\+?[0-9]{10,14})/);
-                    if (phoneMatch) rawPhone = phoneMatch[0];
-                }
-                if (rawPhone) {
-                    phone = rawPhone.replace(/[^0-9]/g, '');
-                }
+                if (cols[25] && cols[25].trim()) phone = cols[25].replace(/[^0-9]/g, '');
+                else if (cols[26] && cols[26].trim()) phone = cols[26].replace(/[^0-9]/g, '');
 
-                // 4. Column AH (Index 33 හෝ 34) හෝ පේළියේ ඇති Destination එක
-                let dest = '';
                 if (cols[33] && cols[33].trim()) dest = cols[33].trim();
                 else if (cols[34] && cols[34].trim()) dest = cols[34].trim();
-                else if (cols[32] && cols[32].trim()) dest = cols[32].trim();
 
-                // වෙනත් කොලම් වලින් හරි ගස්සා ගැනීම (Fallback: W, Z, AH හි ඩේටා නැත්නම් ලූප් කර හොයාගැනීම)
-                if (!name || !phone || !dest) {
+                // 3. ඉහත නිශ්චිත ඉන්ඩෙක්ස් වලින් හමු නොවූයේ නම්, මුල් ක්‍රමය මෙන් පේළිය පුරා ස්කෑන් කර හොයාගැනීම (Smart Fallback)
+                if (!phone) {
+                    const phoneMatch = fullLineStr.match(/(\+?[0-9]{10,14})/);
+                    if (phoneMatch) phone = phoneMatch[1].replace(/[^0-9]/g, '');
+                }
+
+                if (!name || !dest || !phone) {
                     for (let i = 0; i < cols.length; i++) {
                         const val = cols[i] ? cols[i].trim() : '';
                         if (!val) continue;
-                        
-                        // Phone
+
                         const cleanNum = val.replace(/[^0-9]/g, '');
                         if (!phone && cleanNum.length >= 9 && cleanNum.length <= 14) {
                             phone = cleanNum;
-                            continue;
                         }
-                        // Destination
+
                         const lv = val.toLowerCase();
-                        if (!dest && (lv.includes('colombo') || lv.includes('kandy') || lv.includes('galle') || lv.includes('jaffna') || lv.includes('negombo') || lv.includes('gampaha'))) {
+                        if (!dest && (lv.includes('colombo') || lv.includes('kandy') || lv.includes('galle') || lv.includes('jaffna') || lv.includes('negombo') || lv.includes('gampaha') || lv.includes('kurunegala'))) {
                             dest = val;
-                            continue;
                         }
-                        // Name
-                        if (!name && i > 5 && val.length > 2 && !val.match(/^[0-9]+$/) && !lv.includes('http') && !lv.includes('inv')) {
+
+                        if (!name && i >= 10 && val.length > 2 && !val.match(/^[0-9]+$/) && !lv.includes('http') && !lv.includes('inv')) {
                             name = val;
                         }
                     }
