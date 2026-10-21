@@ -194,7 +194,6 @@ async function syncShippingSheet() {
 
 async function syncCustomerSheet() {
     try {
-        // නිවැරදි gid සහිත URL එක භාවිතා කිරීම
         const response = await fetch(GOOGLE_SHEET_CUSTOMER_URL);
         if (!response.ok) return { success: false };
         const csvText = await response.text();
@@ -207,9 +206,9 @@ async function syncCustomerSheet() {
             INSERT INTO cargo (invoice_number, customer_name, customer_phone, destination, updated_at)
             VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
             ON CONFLICT(invoice_number) DO UPDATE SET
-                customer_name = CASE WHEN excluded.customer_name != '' THEN excluded.customer_name ELSE cargo.customer_name END,
-                customer_phone = CASE WHEN excluded.customer_phone != '' THEN excluded.customer_phone ELSE cargo.customer_phone END,
-                destination = CASE WHEN excluded.destination != '' THEN excluded.destination ELSE cargo.destination END,
+                customer_name = COALESCE(NULLIF(cargo.customer_name, ''), excluded.customer_name),
+                customer_phone = COALESCE(NULLIF(cargo.customer_phone, ''), excluded.customer_phone),
+                destination = COALESCE(NULLIF(cargo.destination, ''), excluded.destination),
                 updated_at = CURRENT_TIMESTAMP
         `;
 
@@ -221,60 +220,66 @@ async function syncCustomerSheet() {
                 const line = lines[r].trim();
                 if (!line) continue;
 
-                // Hidden columns සමඟ එන CSV පේළිය නිවැරදිව columns වලට වෙන් කර ගැනීම
                 const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/^["']\vert{}["']$/g, ''));
                 if (cols.length === 0) continue;
 
                 const fullLineStr = cols.join(' ');
 
-                // 1. Invoice Number එක සොයා ගැනීම (පේළියේ ඕනෑම තැනක තිබුණත්)
+                // 1. Invoice Number එක සොයා ගැනීම
                 let inv = '';
                 const invMatch = fullLineStr.match(/\b(INV-?[0-9]+|[0-9]{4,6})\b/i);
                 if (invMatch) inv = invMatch[0].trim();
                 if (!inv && cols[14]) inv = cols[14].trim();
                 if (!inv) continue;
 
+                // 2. Column W (Index 22 හෝ 23) හෝ පේළියේ වෙනත් තැනක ඇති නම
                 let name = '';
+                if (cols[22] && cols[22].trim()) name = cols[22].trim();
+                else if (cols[23] && cols[23].trim()) name = cols[23].trim();
+                else if (cols[21] && cols[21].trim()) name = cols[21].trim();
+
+                // 3. Column Z (Index 25 හෝ 26) හෝ පේළියේ ඇති දුරකථන අංකය
                 let phone = '';
+                let rawPhone = '';
+                if (cols[25] && cols[25].trim()) rawPhone = cols[25];
+                else if (cols[26] && cols[26].trim()) rawPhone = cols[26];
+                else {
+                    const phoneMatch = fullLineStr.match(/(\+?[0-9]{10,14})/);
+                    if (phoneMatch) rawPhone = phoneMatch[0];
+                }
+                if (rawPhone) {
+                    phone = rawPhone.replace(/[^0-9]/g, '');
+                }
+
+                // 4. Column AH (Index 33 හෝ 34) හෝ පේළියේ ඇති Destination එක
                 let dest = '';
+                if (cols[33] && cols[33].trim()) dest = cols[33].trim();
+                else if (cols[34] && cols[34].trim()) dest = cols[34].trim();
+                else if (cols[32] && cols[32].trim()) dest = cols[32].trim();
 
-                // 2. පේළියේ ඇති සෑම කොලම් එකක්ම පරීක්ෂා කර ඩේටා වර්ගය අනුව ලබා ගැනීම
-                for (let i = 0; i < cols.length; i++) {
-                    const val = cols[i] ? cols[i].trim() : '';
-                    if (!val) continue;
-
-                    // Phone Number එක සොයා ගැනීම (ඉලක්කම් 9 ත් 14 ත් අතර)
-                    const cleanNum = val.replace(/[^0-9]/g, '');
-                    if (!phone && cleanNum.length >= 9 && cleanNum.length <= 14) {
-                        phone = cleanNum;
-                        continue;
+                // වෙනත් කොලම් වලින් හරි ගස්සා ගැනීම (Fallback: W, Z, AH හි ඩේටා නැත්නම් ලූප් කර හොයාගැනීම)
+                if (!name || !phone || !dest) {
+                    for (let i = 0; i < cols.length; i++) {
+                        const val = cols[i] ? cols[i].trim() : '';
+                        if (!val) continue;
+                        
+                        // Phone
+                        const cleanNum = val.replace(/[^0-9]/g, '');
+                        if (!phone && cleanNum.length >= 9 && cleanNum.length <= 14) {
+                            phone = cleanNum;
+                            continue;
+                        }
+                        // Destination
+                        const lv = val.toLowerCase();
+                        if (!dest && (lv.includes('colombo') || lv.includes('kandy') || lv.includes('galle') || lv.includes('jaffna') || lv.includes('negombo') || lv.includes('gampaha'))) {
+                            dest = val;
+                            continue;
+                        }
+                        // Name
+                        if (!name && i > 5 && val.length > 2 && !val.match(/^[0-9]+$/) && !lv.includes('http') && !lv.includes('inv')) {
+                            name = val;
+                        }
                     }
-
-                    // Destination එක සොයා ගැනීම (නගර හෝ ප්‍රදේශ නම්)
-                    const lowerVal = val.toLowerCase();
-                    if (!dest && (lowerVal.includes('colombo') || lowerVal.includes('kandy') || lowerVal.includes('galle') || lowerVal.includes('jaffna') || lowerVal.includes('negombo') || lowerVal.includes('kurunegala') || lowerVal.includes('matara') || lowerVal.includes('gampaha'))) {
-                        dest = val;
-                        continue;
-                    }
-
-                    // Shipper Name එක සොයා ගැනීම (අංක නොවන, දිගු පෙළක් වන අවස්ථා)
-                    if (!name && i >= 10 && val.length > 2 && !val.match(/^[0-9]+$/) && !lowerVal.includes('http') && !lowerVal.includes('inv')) {
-                        name = val;
-                    }
-                }
-
-                // 3. නිශ්චිත W (Index 22, 23), Z (Index 25, 26), AH (Index 33, 34) වල අගයන් ද පරීක්ෂා කර බැලීම
-                if (!name) {
-                    if (cols[22] && cols[22].trim()) name = cols[22].trim();
-                    else if (cols[23] && cols[23].trim()) name = cols[23].trim();
-                }
-                if (!phone) {
-                    if (cols[25] && cols[25].trim()) phone = cols[25].replace(/[^0-9]/g, '');
-                    else if (cols[26] && cols[26].trim()) phone = cols[26].replace(/[^0-9]/g, '');
-                }
-                if (!dest) {
-                    if (cols[33] && cols[33].trim()) dest = cols[33].trim();
-                    else if (cols[34] && cols[34].trim()) dest = cols[34].trim();
                 }
 
                 if (inv && inv !== '') {
