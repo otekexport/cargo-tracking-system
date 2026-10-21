@@ -216,21 +216,41 @@ async function syncCustomerSheet() {
             const stmt = db.prepare(query);
             for (let r = 1; r < rows.length; r++) {
                 const row = rows[r] || [];
+                if (row.length === 0) continue;
+
                 const fullLineStr = row.join(' ');
 
-                // 1. පේළියෙන් Invoice Number එක සොයා ගැනීම
+                // 1. ඉන්වොයිස් අංකය සොයා ගැනීම
+                let inv = '';
                 const invMatch = fullLineStr.match(/\b(INV-?[0-9]+|[0-9]{4,6})\b/i);
-                if (!invMatch) continue;
-                let inv = invMatch[0].trim();
+                if (invMatch) inv = invMatch[0].trim();
+                if (!inv && row[14]) inv = row[14].trim();
 
                 // 2. දුරකථන අංකය සොයා ගැනීම
                 let phone = '';
                 const phoneMatch = fullLineStr.match(/(\+?[0-9]{10,14})/);
                 if (phoneMatch) phone = phoneMatch[0].replace(/[^0-9]/g, '');
+                if (!phone && row[25]) phone = row[25].replace(/[^0-9]/g, '');
 
-                // 3. නම සහ Destination එක නිසි පරිදි ලබා ගැනීම
-                let name = row[22] ? row[22].trim() : (row[1] ? row[1].trim() : '');
-                let dest = row[33] ? row[33].trim() : (row[2] ? row[2].trim() : '');
+                // 3. නම සඳහා Column W (Index 22 හෝ 23) භාවිතා කිරීම (Shipper Name)
+                // W කියන්නේ 23 වෙනි කොලම් එක (0-index අනුව 22)
+                let name = '';
+                if (row[22] && row[22].trim() !== '') {
+                    name = row[22].trim();
+                } else if (row[23] && row[23].trim() !== '') {
+                    name = row[23].trim();
+                } else {
+                    // වෙනත් කොලම් එකක නමක් ඇත්දැයි බැලීම
+                    name = row[1] ? row[1].trim() : '';
+                }
+
+                // 4. Destination එක ලබා ගැනීම (Column AH හෝ 33)
+                let dest = '';
+                if (row[33] && row[33].trim() !== '') {
+                    dest = row[33].trim();
+                } else {
+                    dest = row[2] ? row[2].trim() : '';
+                }
 
                 if (inv && inv !== '') {
                     stmt.run([inv, name, phone, dest]);
