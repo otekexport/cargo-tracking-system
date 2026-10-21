@@ -197,8 +197,10 @@ async function syncCustomerSheet() {
         const response = await fetch(GOOGLE_SHEET_CUSTOMER_URL);
         if (!response.ok) return { success: false };
         const csvText = await response.text();
-        const rows = parseCSVMatrix(csvText);
-        if (rows.length < 2) return { success: false };
+        
+        // CSV lines walata kadaganna
+        const lines = csvText.split(/\r?\n/);
+        if (lines.length < 2) return { success: false };
 
         let count = 0;
         const query = `
@@ -214,39 +216,41 @@ async function syncCustomerSheet() {
         db.serialize(() => {
             db.run("BEGIN TRANSACTION");
             const stmt = db.prepare(query);
-            for (let r = 1; r < rows.length; r++) {
-                const row = rows[r] || [];
-                if (row.length === 0) continue;
+            
+            for (let r = 1; r < lines.length; r++) {
+                const line = lines[r].trim();
+                if (!line) continue;
 
-                const fullLineStr = row.join(' ');
+                // CSV row eka columns walata ven karaganna (Quotes athule commas thibunath handle karanna)
+                const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/^["']\vert{}["']$/g, ''));
+                if (cols.length === 0) continue;
 
-                // 1. Invoice Number එක සොයා ගැනීම (පේළියෙන් හෝ සාමාන්‍ය කොලම් වලින්)
+                // 1. Invoice Number eka hoyaganna (Row eke kohe thibunath regex match karala)
                 let inv = '';
+                const fullLineStr = cols.join(' ');
                 const invMatch = fullLineStr.match(/\b(INV-?[0-9]+|[0-9]{4,6})\b/i);
                 if (invMatch) inv = invMatch[0].trim();
-                if (!inv && row[14]) inv = row[14].trim(); // Fallback index
+                if (!inv && cols[14]) inv = cols[14].trim();
+                if (!inv) continue;
 
-                if (!inv) continue; // ඉන්වොයිස් අංකයක් නැත්නම් මෙම පේළිය මඟ හරින්න
-
-                // 2. Column W (Index 22 හෝ 23) - Shipper Name ලබා ගැනීම
+                // 2. Column W (Index 22) - Shipper Name
                 let name = '';
-                if (row[22] && row[22].trim() !== '') {
-                    name = row[22].trim(); // Column W (0-index 22)
-                } else if (row[23] && row[23].trim() !== '') {
-                    name = row[23].trim(); 
-                } else if (row[21] && row[21].trim() !== '') {
-                    name = row[21].trim();
+                if (cols[22] && cols[22].trim() !== '') {
+                    name = cols[22].trim();
+                } else if (cols[23] && cols[23].trim() !== '') {
+                    name = cols[23].trim();
+                } else if (cols[21] && cols[21].trim() !== '') {
+                    name = cols[21].trim();
                 }
 
-                // 3. Column Z (Index 25 හෝ 26) - Phone Number ලබා ගැනීම
+                // 3. Column Z (Index 25) - Phone Number
                 let phone = '';
                 let rawPhone = '';
-                if (row[25] && row[25].trim() !== '') {
-                    rawPhone = row[25]; // Column Z
-                } else if (row[26] && row[26].trim() !== '') {
-                    rawPhone = row[26];
+                if (cols[25] && cols[25].trim() !== '') {
+                    rawPhone = cols[25];
+                } else if (cols[26] && cols[26].trim() !== '') {
+                    rawPhone = cols[26];
                 } else {
-                    // මුළු පේළියෙන්ම ෆෝන් නම්බර් එකක් සෙවීම (Fallback)
                     const phoneMatch = fullLineStr.match(/(\+?[0-9]{10,14})/);
                     if (phoneMatch) rawPhone = phoneMatch[0];
                 }
@@ -254,17 +258,16 @@ async function syncCustomerSheet() {
                     phone = rawPhone.replace(/[^0-9]/g, '');
                 }
 
-                // 4. Column AH (Index 33 හෝ 34) - Destination ලබා ගැනීම
+                // 4. Column AH (Index 33) - Destination
                 let dest = '';
-                if (row[33] && row[33].trim() !== '') {
-                    dest = row[33].trim(); // Column AH
-                } else if (row[34] && row[34].trim() !== '') {
-                    dest = row[34].trim();
-                } else if (row[32] && row[32].trim() !== '') {
-                    dest = row[32].trim();
+                if (cols[33] && cols[33].trim() !== '') {
+                    dest = cols[33].trim();
+                } else if (cols[34] && cols[34].trim() !== '') {
+                    dest = cols[34].trim();
+                } else if (cols[32] && cols[32].trim() !== '') {
+                    dest = cols[32].trim();
                 }
 
-                // ඩාටාබේස් එකට ඇතුළත් කිරීම
                 if (inv && inv !== '') {
                     stmt.run([inv, name, phone, dest]);
                     count++;
