@@ -14,7 +14,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
-// 📊 Google Sheet URLs
+// 📊 Google Sheet URLs (අලුත් Customer Sheet එක සමඟ)
 const GOOGLE_SHEET_SHIPPING_URL = 'https://docs.google.com/spreadsheets/d/1iWvwlNWxX9LV5AssmlMw-wYeF09ILncXamjulrdihDQ/export?format=csv';
 const GOOGLE_SHEET_CUSTOMER_URL = 'https://docs.google.com/spreadsheets/d/165g39MP4HHIrMulhqM3Ot8isCrp5FP_0ZwtX8Aafg-A/export?format=csv&gid=1275767839';
 const GOOGLE_SHEET_AMOUNT_URL = 'https://docs.google.com/spreadsheets/d/104cDSC0HcAr1S8zJQZhRITIdqNuBj1RUH9L1CYHOtJg/export?format=csv';
@@ -238,6 +238,58 @@ async function syncCustomerSheet() {
 
                 if (inv && inv !== '') {
                     stmt.run([inv, name, phone, dest]);
+                    count++;
+                }
+            }
+            stmt.finalize();
+            db.run("COMMIT");
+        });
+        return { success: true, count };
+    } catch (err) {
+        return { success: false, error: err.message };
+    }
+}
+
+async function syncAmountSheet() {
+    try {
+        const response = await fetch(GOOGLE_SHEET_AMOUNT_URL);
+        if (!response.ok) return { success: false };
+        const csvText = await response.text();
+        const rows = parseCSVMatrix(csvText);
+        if (rows.length < 2) return { success: false };
+
+        let count = 0;
+        const query = `
+            INSERT INTO cargo (invoice_number, amount, full_price, updated_at)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(invoice_number) DO UPDATE SET
+                amount = CASE WHEN excluded.amount > 0 THEN excluded.amount ELSE cargo.amount END,
+                full_price = CASE WHEN excluded.full_price > 0 THEN excluded.full_price ELSE cargo.full_price END,
+                updated_at = CURRENT_TIMESTAMP
+        `;
+
+        db.serialize(() => {
+            db.run("BEGIN TRANSACTION");
+            const stmt = db.prepare(query);
+            for (let r = 1; r < rows.length; r++) {
+                const row = rows[r];
+                const inv = (row[0] !== undefined) ? row[0].trim() : '';
+                
+                let amt = 0;
+                if (row[10] !== undefined) {
+                    const val = parseFloat(row[10].toString().replace(/[^0-9.-]+/g, ""));
+                    if (!isNaN(val)) amt = val;
+                }
+
+                let fullPrice = 0;
+                if (row[5] !== undefined) {
+                    const valF = parseFloat(row[5].toString().replace(/[^0-9.-]+/g, ""));
+                    if (!isNaN(valF)) fullPrice = valF;
+                }
+                if (fullPrice === 0 && amt > 0) fullPrice = amt;
+
+                if (inv && inv !== '') {
+                    stmt.run([inv, amt, fullPrice]);
                     count++;
                 }
             }
@@ -594,6 +646,6 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log(`Server running on port PORT ${PORT}`);
     syncGoogleSheetData();
 });
