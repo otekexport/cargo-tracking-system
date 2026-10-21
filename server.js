@@ -201,6 +201,24 @@ async function syncCustomerSheet() {
         const lines = csvText.split(/\r?\n/);
         if (lines.length < 2) return { success: false };
 
+        // 1. මුල් පේළිය (Header Row) පරීක්ෂා කර W (Index 22), Z (Index 25), AH (Index 33) හෝ අදාළ කොලම් අංක හොයාගැනීම
+        const headerCols = lines[0].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/^["']\vert{}["']$/g, '').toLowerCase());
+        
+        let invIdx = -1;
+        let nameIdx = 22; // Default W index
+        let phoneIdx = 25; // Default Z index
+        let destIdx = 33; // Default AH index
+
+        // Header එකෙන් නිවැරදි කොලම් ඉන්ඩෙක්ස් සොයා ගැනීම
+        headerCols.forEach((col, idx) => {
+            if (col.includes('invoice') || col.includes('inv')) invIdx = idx;
+            if (col.includes('shipper') || col.includes('name')) {
+                if (nameIdx === 22) nameIdx = idx; // මුල්ම නම හෝ Shipper එක ගන්න
+            }
+            if (col.includes('phone') || col.includes('mobile') || col.includes('tel')) phoneIdx = idx;
+            if (col.includes('destination') || col.includes('dest') || col.includes('address')) destIdx = idx;
+        });
+
         let count = 0;
         const query = `
             INSERT INTO cargo (invoice_number, customer_name, customer_phone, destination, updated_at)
@@ -220,30 +238,39 @@ async function syncCustomerSheet() {
                 const line = lines[r].trim();
                 if (!line) continue;
 
-                // CSV row එක columns වලට වෙන් කර ගැනීම
                 const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/^["']\vert{}["']$/g, ''));
                 if (cols.length === 0) continue;
 
-                // 1. Invoice Number එක සොයා ගැනීම
-                let inv = '';
                 const fullLineStr = cols.join(' ');
-                const invMatch = fullLineStr.match(/\b(INV-?[0-9]+|[0-9]{4,6})\b/i);
-                if (invMatch) inv = invMatch[0].trim();
+
+                // Invoice Number එක සොයා ගැනීම
+                let inv = '';
+                if (invIdx !== -1 && cols[invIdx]) {
+                    inv = cols[invIdx].trim();
+                }
+                if (!inv) {
+                    const invMatch = fullLineStr.match(/\b(INV-?[0-9]+|[0-9]{4,6})\b/i);
+                    if (invMatch) inv = invMatch[0].trim();
+                }
                 if (!inv && cols[14]) inv = cols[14].trim();
                 if (!inv) continue;
 
-                // 2. Column W (Index 22) - Shipper Name (නම සඳහා)
+                // Name (Shipper Name - Column W අසල හෝ Header එකෙන් හොයාගත් Index එක)
                 let name = '';
-                if (cols[22] && cols[22].trim() !== '') {
+                if (cols[nameIdx] && cols[nameIdx].trim() !== '') {
+                    name = cols[nameIdx].trim();
+                } else if (cols[22] && cols[22].trim() !== '') {
                     name = cols[22].trim();
                 } else if (cols[23] && cols[23].trim() !== '') {
                     name = cols[23].trim();
                 }
 
-                // 3. Column Z (Index 25) - Phone Number (දුරකථන අංකය සඳහා)
+                // Phone Number (Column Z අසල හෝ Header එකෙන් හොයාගත් Index එක)
                 let phone = '';
                 let rawPhone = '';
-                if (cols[25] && cols[25].trim() !== '') {
+                if (cols[phoneIdx] && cols[phoneIdx].trim() !== '') {
+                    rawPhone = cols[phoneIdx];
+                } else if (cols[25] && cols[25].trim() !== '') {
                     rawPhone = cols[25];
                 } else if (cols[26] && cols[26].trim() !== '') {
                     rawPhone = cols[26];
@@ -255,14 +282,14 @@ async function syncCustomerSheet() {
                     phone = rawPhone.replace(/[^0-9]/g, '');
                 }
 
-                // 4. Column AH (Index 33) - Destination (ගමනාන්තය සඳහා)
+                // Destination (Column AH අසල හෝ Header එකෙන් හොයාගත් Index එක)
                 let dest = '';
-                if (cols[33] && cols[33].trim() !== '') {
+                if (cols[destIdx] && cols[destIdx].trim() !== '') {
+                    dest = cols[destIdx].trim();
+                } else if (cols[33] && cols[33].trim() !== '') {
                     dest = cols[33].trim();
                 } else if (cols[34] && cols[34].trim() !== '') {
                     dest = cols[34].trim();
-                } else if (cols[32] && cols[32].trim() !== '') {
-                    dest = cols[32].trim();
                 }
 
                 if (inv && inv !== '') {
